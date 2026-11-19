@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: lyra-postgres
+    environment:
+      # Values come from the repository-root .env file (see .env.example).
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: lyra-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+    ports:
+      - "5672:5672"   # AMQP port for .NET MassTransit
+      - "15672:15672" # Web dashboard (login: RABBITMQ_DEFAULT_USER / RABBITMQ_DEFAULT_PASS from .env)
+
+  redis:
+    image: redis:7-alpine
+    container_name: lyra-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

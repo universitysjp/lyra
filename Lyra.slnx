@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="Lyra.Catalog.Api/Lyra.Catalog.Api.csproj" />
+  <Project Path="Lyra.Contracts/Lyra.Contracts.csproj" />
+  <Project Path="Lyra.Enrichment.Worker/Lyra.Enrichment.Worker.csproj" />
+  <Project Path="Lyra.Gateway/Lyra.Gateway.csproj" />
+  <Project Path="Lyra.Identity.Api/Lyra.Identity.Api.csproj" />
+  <Project Path="Lyra.PlaylistRag.Api/Lyra.PlaylistRag.Api.csproj" />
+  <Project Path="tests/Lyra.Catalog.Api.Tests/Lyra.Catalog.Api.Tests.csproj" />
+  <Project Path="tests/Lyra.Identity.Api.Tests/Lyra.Identity.Api.Tests.csproj" />
+</Solution>

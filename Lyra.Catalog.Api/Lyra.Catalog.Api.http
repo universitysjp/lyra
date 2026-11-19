@@ -1,0 +1,78 @@
+@Lyra.Gateway_HostAddress = http://localhost:5000
+@email = listener@example.com
+@password = StrongPassword123!
+@accessToken = PASTE_ACCESS_TOKEN_FROM_LOGIN_HERE
+
+### 1. Register a user (201 Created)
+POST {{Lyra.Gateway_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 2. Login and copy accessToken into @accessToken above
+POST {{Lyra.Gateway_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 3. Import a batch of local track metadata (202 Accepted)
+POST {{Lyra.Gateway_HostAddress}}/api/catalog/tracks/batch
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tracks": [
+    {
+      "localTrackId": "device-track-001",
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "album": "A Night at the Opera",
+      "durationSeconds": 355
+    },
+    {
+      "localTrackId": "device-track-002",
+      "title": "Sultans of Swing",
+      "artist": "Dire Straits",
+      "album": "Dire Straits",
+      "durationSeconds": 348
+    },
+    {
+      "localTrackId": "device-track-003",
+      "title": "Don't Stop Me Now",
+      "artist": "Queen",
+      "album": "Jazz",
+      "durationSeconds": 209
+    }
+  ]
+}
+
+### 4. List the caller's library, newest first (200 OK)
+GET {{Lyra.Gateway_HostAddress}}/api/catalog/tracks?page=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### 5. Fuzzy search by title or artist (200 OK)
+GET {{Lyra.Gateway_HostAddress}}/api/catalog/tracks/search?q=bohemain%20rhapsody
+Authorization: Bearer {{accessToken}}
+
+### 6. Re-post the same batch and observe duplicates (202 Accepted)
+POST {{Lyra.Gateway_HostAddress}}/api/catalog/tracks/batch
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tracks": [
+    {
+      "localTrackId": "device-track-001",
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "album": "A Night at the Opera",
+      "durationSeconds": 355
+    }
+  ]
+}

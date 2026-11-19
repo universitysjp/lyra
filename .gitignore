@@ -1,0 +1,18 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+*.pem
+
+# Secrets / local environment — never commit real credentials.
+.env
+.env.*
+!.env.example
+
+# Rider HTTP client environments (may contain secrets).
+http-client.private.env.json
+
+# IDE data sources can embed credentials in JDBC URLs.
+.idea/**/dataSources.xml
+.idea/**/dataSources.local.xml

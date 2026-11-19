@@ -1,0 +1,36 @@
+@gatewayUrl = http://localhost:5000
+
+### Register through Gateway
+# @name register
+POST {{gatewayUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Password123!"
+}
+
+### Login through Gateway
+# @name login
+POST {{gatewayUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Password123!"
+}
+
+### Access Catalog Ping (Requires Token)
+@accessToken = {{login.response.body.accessToken}}
+GET {{gatewayUrl}}/api/catalog/ping
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Access Playlists Ping (Requires Token)
+GET {{gatewayUrl}}/api/playlists/ping
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Access Catalog Ping without Token (Expect 401)
+GET {{gatewayUrl}}/api/catalog/ping
+Accept: application/json
