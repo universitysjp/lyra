@@ -8,5 +8,6 @@
   <Project Path="Lyra.PlaylistRag.Api/Lyra.PlaylistRag.Api.csproj" />
   <Project Path="tests/Lyra.AI.Tests/Lyra.AI.Tests.csproj" />
   <Project Path="tests/Lyra.Catalog.Api.Tests/Lyra.Catalog.Api.Tests.csproj" />
+  <Project Path="tests/Lyra.Enrichment.Worker.Tests/Lyra.Enrichment.Worker.Tests.csproj" />
   <Project Path="tests/Lyra.Identity.Api.Tests/Lyra.Identity.Api.Tests.csproj" />
 </Solution>

@@ -244,7 +244,7 @@ Following existing Identity layering:
 
 - Replace heartbeat registration with numbered host composition: root `.env` loading via DotNetEnv, validated options, MassTransit, typed HTTP clients, Redis, `AddLyraAiProviders`, application services, and consumers.
 - Add configuration types for `RabbitMq`, `Lrclib`, `Identity`, `InternalServices`, `Redis`, and `Enrichment` (concurrency/retry/timeouts/cache TTL/lock TTL/lyrics bound/LRCLIB interval).
-- `Services/AiConnections/IdentityAiConnectionClient` calls the generated private Identity gRPC client with the internal credential metadata, distinguishes gRPC `NotFound` from transport/server failures, and returns `AiConnectionSecret`. It does not cache decrypted keys in Redis.
+- `Services/AiConnections/IdentityUserAiConnectionClient` calls the generated private Identity gRPC client with the internal credential metadata, distinguishes gRPC `NotFound` from transport/server failures, and returns `AiConnectionSecret`. It does not cache decrypted keys in Redis.
 - `Services/Lyrics/ILyricsClient` and `LrclibLyricsClient` own query construction, bounded response DTOs, time spacing, and `404` handling.
 - `Services/Caching/IEnrichmentResultStore` and `RedisEnrichmentResultStore` own result serialization and lock acquisition/release. Cache payload is `TrackEnrichmentResult`, never the song/user/connection DTO. A lock lease has a unique owner token to avoid releasing another consumer's lock.
 - MassTransit `SongImportedConsumerDefinition` sets endpoint concurrency/prefetch to 3, applies bounded `Exponential` message retry for transient failures, and `UseInMemoryOutbox(context)`. Non-transient failures are not retried in a tight loop and ultimately reach the consumer error queue.
@@ -470,7 +470,7 @@ graph LR
   - `AiChatClientFactoryTests`, `OpenCodeChatClientProviderTests`, and provider error-classification tests.
 - **`tests/Lyra.Enrichment.Worker.Tests/`**
   - `LrclibLyricsClientTests` using a stub `HttpMessageHandler`.
-  - `IdentityAiConnectionClientTests` for secret DTO handling, `404`, and transport/status classification.
+  - `IdentityUserAiConnectionClientTests` for secret DTO handling, gRPC `NotFound`, metadata, and transport/status classification.
   - `TrackAnalysisServiceTests` for structured-result validation, prompt bounds, and metadata-only analysis.
   - `SemanticSummaryBuilderTests` for deterministic bounded summary content.
   - `TrackEnrichmentServiceTests` for cache/lock orchestration and event mapping.
