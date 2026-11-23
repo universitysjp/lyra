@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package lyra.identity.v1;
+
+option csharp_namespace = "Lyra.Contracts.Grpc.Identity";
+
+// Private Identity-to-service contract. The response contains a decrypted
+// provider API key and must only travel over an authenticated, encrypted
+// internal channel.
+service UserAiConnectionService {
+  rpc GetAiConnection (GetAiConnectionRequest) returns (GetAiConnectionResponse);
+}
+
+message GetAiConnectionRequest {
+  string user_id = 1;
+}
+
+message GetAiConnectionResponse {
+  AiProvider provider = 1;
+  string model = 2;
+  string api_key = 3;
+  OpenCodePlan open_code_plan = 4;
+}
+
+enum AiProvider {
+  AI_PROVIDER_UNSPECIFIED = 0;
+  AI_PROVIDER_OPEN_AI = 1;
+  AI_PROVIDER_GEMINI = 2;
+  AI_PROVIDER_OPEN_CODE = 3;
+  AI_PROVIDER_ANTHROPIC = 4;
+}
+
+enum OpenCodePlan {
+  OPEN_CODE_PLAN_UNSPECIFIED = 0;
+  OPEN_CODE_PLAN_PAY_AS_YOU_GO = 1;
+  OPEN_CODE_PLAN_GO = 2;
+}

@@ -26,7 +26,7 @@
 
 ## Architecture
 
-Lyra follows a **database-per-service** microservices architecture with asynchronous, event-driven communication via RabbitMQ (MassTransit) and synchronous request routing via a YARP API gateway.
+Lyra follows a **database-per-service** microservices architecture with asynchronous, event-driven communication via RabbitMQ (MassTransit), synchronous public request routing via a YARP API gateway, and authenticated private service-to-service gRPC over HTTP/2.
 
 ```
                          ┌──────────────────┐
@@ -52,7 +52,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of e
 
 | Service | Type | Responsibility | Database |
 |---|---|---|---|
-| `Lyra.Contracts` | Class Library | Shared immutable `record` event/DTO definitions (`SongImportedEvent`, `SongEnrichedEvent`) | — |
+| `Lyra.Contracts` | Class Library | Shared event/DTO definitions and private gRPC protobuf contracts (`SongImportedEvent`, `SongEnrichedEvent`) | — |
 | `Lyra.Gateway` | ASP.NET Core + YARP | Single entry point; JWT validation, rate limiting, routing | — |
 | `Lyra.Identity.Api` | ASP.NET Core Web API | Registration, login, JWT issuance | `identity_db` |
 | `Lyra.Catalog.Api` | ASP.NET Core Web API | Batch track ingestion, dedup, fuzzy search, Redis cache-aside | `catalog_db` |

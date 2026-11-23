@@ -21,6 +21,12 @@ public sealed class AppStringOptions
         public string UnhandledError { get; set; } = string.Empty;
         public string ValidationFailed { get; set; } = string.Empty;
         public string InvalidInputCode { get; set; } = string.Empty;
+        public string AiProviderInvalid { get; set; } = string.Empty;
+        public string AiModelInvalid { get; set; } = string.Empty;
+        public string AiApiKeyInvalid { get; set; } = string.Empty;
+        public string AiOpenCodePlanRequired { get; set; } = string.Empty;
+        public string AiOpenCodePlanNotAllowed { get; set; } = string.Empty;
+        public string AiConnectionNotFound { get; set; } = string.Empty;
     }
 
     public sealed class TitleStrings

@@ -13,9 +13,9 @@ Lyra is a backend microservices platform for an AI-powered local music mobile ap
 
 **Target Framework:** .NET 10.0 (C# 14) using Minimal APIs. Strict database-per-service isolation — **never** share `DbContext` instances or database schemas across services.
 
-1. **`Lyra.Contracts`** (Class Library): Shared immutable `record` definitions for MassTransit events (`SongImportedEvent`, `SongEnrichedEvent`) and common DTOs.
+1. **`Lyra.Contracts`** (Class Library): Shared immutable `record` definitions for MassTransit events (`SongImportedEvent`, `SongEnrichedEvent`), common DTOs, and protobuf definitions for private service-to-service gRPC contracts.
 2. **`Lyra.Gateway`** (ASP.NET Core Web App + YARP): Single entry point (`Yarp.ReverseProxy`). Validates JWTs, enforces rate limiting, and routes `/api/auth/*`, `/api/catalog/*`, and `/api/playlists/*` to downstream services.
-3. **`Lyra.Identity.Api`** (ASP.NET Core Web API): User registration, login, and JWT issuance (with `sub` / `userId` claims). Database: `identity_db` (PostgreSQL).
+3. **`Lyra.Identity.Api`** (ASP.NET Core Web API): User registration, login, JWT issuance (with `sub` / `userId` claims), encrypted per-user AI connections, and a private authenticated gRPC lookup service. Database: `identity_db` (PostgreSQL).
 4. **`Lyra.Catalog.Api`** (ASP.NET Core Web API):
    - Receives batch track metadata (`POST /api/catalog/tracks/batch`) with deterministic `TrackFingerprint` (SHA-256 of normalized `Title + Artist + DurationSeconds`) for deduplication.
    - Uses PostgreSQL `pg_trgm` GIN indexes for fast fuzzy search and **Redis** (`StackExchange.Redis`) for cache-aside user library reads.
@@ -36,6 +36,7 @@ Lyra is a backend microservices platform for an AI-powered local music mobile ap
 
 - **Database:** PostgreSQL 17 (`pgvector/pgvector:pg17` Docker image) via `Npgsql.EntityFrameworkCore.PostgreSQL` & `Pgvector.EntityFrameworkCore`.
 - **Message Broker:** RabbitMQ 4 via **`MassTransit.RabbitMQ` v8.x** (stay on Apache 2.0 v8.5.x; do **not** upgrade to commercial v9).
+- **Private service-to-service RPC:** gRPC over HTTP/2 via `Grpc.AspNetCore`/`Grpc.Net.Client`. Internal services use a separate non-Gateway endpoint authenticated with `InternalServices:ApiKey`; non-Development deployments must use TLS.
 - **Caching:** Redis 7 via `Microsoft.Extensions.Caching.StackExchangeRedis`.
 - **AI Abstraction:** `Microsoft.Extensions.AI` (configured via `appsettings.json` to use cloud APIs like Gemini/OpenAI — do **not** assume local Ollama due to 12 GB host RAM constraints).
 

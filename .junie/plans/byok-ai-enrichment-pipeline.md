@@ -8,7 +8,7 @@ When this is done:
 
 - An authenticated user can select **OpenAI, Gemini, OpenCode Console, or Anthropic Claude**, provide a model ID and their own API key, and replace or remove that connection through Identity endpoints.
 - API keys are encrypted at rest in `identity_db`, are never returned by user-facing read endpoints, and are never placed in RabbitMQ messages, logs, Redis, Catalog, or playlists.
-- `Lyra.Enrichment.Worker` consumes `SongImportedEvent`, resolves the current user's connection through a private Identity API, fetches plain lyrics from LRCLIB, and obtains structured `PrimaryMood`, `Themes`, and `EnergyLevel` output through `IChatClient`.
+- `Lyra.Enrichment.Worker` consumes `SongImportedEvent`, resolves the current user's connection through Identity's private gRPC service, fetches plain lyrics from LRCLIB, and obtains structured `PrimaryMood`, `Themes`, and `EnergyLevel` output through `IChatClient`.
 - A shared `Lyra.AI` class library owns provider-specific chat-client creation and error normalization. Enrichment logic depends only on `Microsoft.Extensions.AI`, not on individual SDK types.
 - Every successfully processed import publishes a `SongEnrichedEvent`, including imports from another user for an already-global track so the future per-user RAG consumer is not starved.
 - Repeated work for the same global track is reduced by a Redis enrichment-result cache and per-track execution lock, while enrichment results remain free of user credentials and user identifiers.
@@ -33,7 +33,7 @@ When this is done:
    - One current AI connection per user (`Provider`, `Model`, encrypted `ApiKey`, and OpenCode plan when applicable).
    - Authenticated get/upsert/delete endpoints returning metadata only.
    - ASP.NET Core Data Protection for encryption, with its key ring persisted through Identity's own EF Core context.
-   - A private worker-only endpoint that decrypts and returns the connection for a requested user. It is not routed through the public Gateway and requires a separate deployment-managed internal service credential.
+   - A private worker-only gRPC service that decrypts and returns the connection for a requested user. It runs on a separate HTTP/2 listener, is not routed through the public Gateway, and requires a separate deployment-managed internal service credential.
 
 4. **`Lyra.Enrichment.Worker`**
    - RabbitMQ consumption with `PrefetchCount = 3`, `ConcurrentMessageLimit = 3`, bounded exponential retry, and an in-memory consumer outbox.
@@ -80,7 +80,7 @@ When this is done:
 | `GET /api/auth/ai-connection` | Requires the user's bearer JWT. Returns `200` with `Provider`, `Model`, optional `OpenCodePlan`, `CreatedAt`, and `UpdatedAt`; returns `404` when no connection exists. Never returns the API key or protected key text. |
 | `PUT /api/auth/ai-connection` | Requires auth. Validates and atomically creates or replaces the caller's single connection, encrypting a nonblank API key before persistence. Returns `200` with non-secret metadata. Replaces the key on every successful upsert; there is no silent “keep the old key” sentinel. |
 | `DELETE /api/auth/ai-connection` | Requires auth. Deletes only the caller's connection and returns `204`; repeated deletion remains `204`. |
-| `GET /internal/ai-connections/{userId:guid}` | Requires the internal service credential, not an end-user JWT. Returns `200` with the decrypted internal connection DTO or `404` if absent. Excluded from public OpenAPI descriptions and not routed by `Lyra.Gateway`. |
+| gRPC `UserAiConnectionService/GetAiConnection` | Runs on Identity's private HTTP/2 listener (`5004` in Development). Requires `x-lyra-internal-key` metadata, not an end-user JWT. Returns the decrypted connection or gRPC `NotFound`; invalid input and missing credentials map to `InvalidArgument` and `Unauthenticated`. Not routed by `Lyra.Gateway`. |
 
 - Valid providers are exactly `OpenAI`, `Gemini`, `OpenCode`, and `Anthropic`.
 - `Model` is trimmed, nonblank, and bounded; `ApiKey` is nonblank and bounded to protect request bodies/storage. A provider/model compatibility check is not simulated locally.
@@ -237,14 +237,14 @@ Following existing Identity layering:
 - Add an EF Core migration creating `user_ai_connections` and `data_protection_keys`. The key-ring table lets all Identity instances decrypt existing payloads after restart; production deployment must additionally protect the key ring using deployment-managed certificate/key protection appropriate to that environment.
 - Add `Services/AiConnections/IUserAiConnectionService` and primary-constructor implementation for get/upsert/delete plus internal lookup/decryption.
 - Add request/response DTOs and `Endpoints/AiConnectionEndpoints` at `/api/auth/ai-connection` with `.RequireAuthorization()` applied explicitly to its group/endpoints. The existing Gateway `auth-route` forwards anonymously and the existing `/api/auth` group is not globally protected, so endpoint authorization is mandatory. Responses contain no `ProtectedApiKey` and no plaintext key.
-- Add a narrowly scoped internal-service credential validator/middleware for `/internal/ai-connections/*`. Use a high-entropy deployment secret from `InternalServices:ApiKey`, constant-time credential comparison, no query-string credentials, and exclude these endpoints from public API descriptions.
+- Add a narrowly scoped internal-service gRPC interceptor for `UserAiConnectionService`. Use a high-entropy deployment secret from `InternalServices:ApiKey` in `x-lyra-internal-key` metadata and constant-time credential comparison. Map the service with `MapGrpcService` on a separate HTTP/2 listener; non-Development deployments require an HTTPS gRPC URL.
 - Public unknown provider/plan/model/key validation errors use existing Identity validation/AppStrings/problem-details conventions. Internal decryption failures are server errors, never echoed with protected or plaintext values.
 
 #### `Lyra.Enrichment.Worker` — dependency clients and cache
 
 - Replace heartbeat registration with numbered host composition: root `.env` loading via DotNetEnv, validated options, MassTransit, typed HTTP clients, Redis, `AddLyraAiProviders`, application services, and consumers.
 - Add configuration types for `RabbitMq`, `Lrclib`, `Identity`, `InternalServices`, `Redis`, and `Enrichment` (concurrency/retry/timeouts/cache TTL/lock TTL/lyrics bound/LRCLIB interval).
-- `Services/AiConnections/IdentityAiConnectionClient` calls the private Identity endpoint with the internal credential, distinguishes missing connection (`404`) from transport/server failures, and returns `AiConnectionSecret`. It does not cache decrypted keys in Redis.
+- `Services/AiConnections/IdentityAiConnectionClient` calls the generated private Identity gRPC client with the internal credential metadata, distinguishes gRPC `NotFound` from transport/server failures, and returns `AiConnectionSecret`. It does not cache decrypted keys in Redis.
 - `Services/Lyrics/ILyricsClient` and `LrclibLyricsClient` own query construction, bounded response DTOs, time spacing, and `404` handling.
 - `Services/Caching/IEnrichmentResultStore` and `RedisEnrichmentResultStore` own result serialization and lock acquisition/release. Cache payload is `TrackEnrichmentResult`, never the song/user/connection DTO. A lock lease has a unique owner token to avoid releasing another consumer's lock.
 - MassTransit `SongImportedConsumerDefinition` sets endpoint concurrency/prefetch to 3, applies bounded `Exponential` message retry for transient failures, and `UseInMemoryOutbox(context)`. Non-transient failures are not retried in a tight loop and ultimately reach the consumer error queue.
@@ -352,6 +352,8 @@ Lyra.AI/
   Providers/ClaudeChatClientProvider.cs                      (new)
 Lyra.Contracts/
   AI/AiProvider.cs, OpenCodePlan.cs, AiConnectionSecret.cs    (new)
+  AI/InternalGrpcMetadata.cs                                (new)
+  Protos/identity_ai_connection.proto                       (new)
   Events/                                                   (unchanged)
 Lyra.Identity.Api/
   Models/UserAiConnection.cs                                (new)
@@ -360,7 +362,8 @@ Lyra.Identity.Api/
   Endpoints/AiConnectionEndpoints.cs                        (new)
   DTOs/Requests/UpsertAiConnectionRequest.cs                (new)
   DTOs/Responses/AiConnectionResponse.cs                    (new)
-  Middleware or Security/InternalServiceCredential*.cs       (new)
+  Grpc/UserAiConnectionGrpcService.cs                       (new)
+  Grpc/InternalServiceAuthenticationInterceptor.cs          (new)
   Configuration/InternalServicesOptions.cs                  (new)
   Migrations/                                               (one new migration)
   Program.cs, appsettings*.json, AppStrings resources       (updated)
@@ -404,8 +407,8 @@ graph LR
   CAT[Lyra.Catalog.Api] -->|transactional bus outbox| MQ[(RabbitMQ)]
   MQ -->|SongImportedEvent| W[Lyra.Enrichment.Worker]
   W -->|cache hit / per-track lock| R[(Redis)]
-  W -->|private internal credential| IA
-  IA -->|decrypted connection over private API| W
+  W -->|private gRPC + internal credential| IA
+  IA -->|decrypted connection over gRPC/HTTP2| W
   W -->|GET /api/get| L[LRCLIB]
   W -->|IChatClient + user key| P[OpenAI / Gemini / OpenCode / Claude]
   W -->|SongEnrichedEvent per import| MQ
@@ -421,7 +424,7 @@ graph LR
 - **First-success global enrichment depends on the selected provider/model.** That result is shared across users by design. Subsequent events must not overwrite it, while per-user downstream events continue. Future re-enrichment/model-quality controls require a separate design.
 - **Redis cache/locks do not guarantee exactly-once external billing.** Expiry, crashes, and lock timeout can still duplicate external calls. They reduce contention only; cost/usage remains the user's provider responsibility. Lock lifetime must exceed configured external-request bounds.
 - **Provider structured-output support varies by model, especially through a gateway.** Typed deserialization and domain validation remain mandatory even with a JSON schema. Unsupported models fail with actionable sanitized errors rather than loose text parsing.
-- **The private Identity endpoint can decrypt any requested user's current key.** Protect it with a separate strong credential, private routing/networking, strict endpoint scope, no Gateway route, no OpenAPI exposure, and TLS outside development. Do not add a general internal user-data API.
+- **The private Identity gRPC service can decrypt any requested user's current key.** Protect it with a separate strong metadata credential, a separate HTTP/2 listener, private routing/networking, strict RPC scope, no Gateway route, and mandatory TLS outside development. Do not add a general internal user-data service.
 - **API keys can be exposed through diagnostics even when encrypted at rest.** Never enable raw request/response-body logging for Identity internal endpoints or AI SDKs in normal environments, and sanitize provider exceptions.
 - **Multiple service instances can still race around long external calls.** Catalog's first-success update and opaque cache tokens preserve correctness even if the Redis lock expires or a result is recomputed.
 - **LRCLIB has its own rate limits and duration constraints.** Keep requests URL-encoded, throttled, and distinguish not-found from availability failures.
@@ -445,7 +448,7 @@ graph LR
 2. The same user replaces it with Gemini, then deletes it. Only one row exists after replacement, delete returns `204`, and subsequent public/internal reads report not found.
 3. User A cannot read, overwrite, or delete User B's connection through public endpoints because every query is scoped to the JWT user.
 4. OpenCode selection without a plan, an OpenCode plan on another provider, blank model/key, and unknown enum values produce `400` problem details and no write.
-5. Internal lookup without a credential, with a wrong credential, or with only a user JWT is rejected. The public Gateway has no route to `/internal/ai-connections/*`.
+5. gRPC lookup without metadata, with a wrong internal credential, or with only a user JWT is rejected with `Unauthenticated`. The public Gateway has no route to the gRPC listener or service path.
 6. Factory selection yields an `IChatClient` for each provider; OpenCode Pay-as-you-go and Go use their respective documented base URLs and stable session ID, with no arbitrary endpoint override.
 7. A new import with lyrics returns `SongEnrichedEvent` with the original `TrackId`/`UserId`, full plain lyrics, normalized theme list, valid energy, deterministic summary, and UTC timestamp.
 8. LRCLIB `404` still calls the fake AI client using metadata only, sets event lyrics to null, and successfully publishes.
@@ -497,9 +500,9 @@ graph LR
 
 **Outcome:** Users can securely manage one BYOK connection and Worker can obtain it privately without database sharing.
 
-- Add `UserAiConnection`, Data Protection key persistence, the Identity migration, encryption service, public metadata-only CRUD endpoints, and internal service lookup.
+- Add `UserAiConnection`, Data Protection key persistence, the Identity migration, encryption service, public metadata-only CRUD endpoints, shared protobuf contract, and authenticated internal gRPC lookup.
 - Wire configuration, internal credential validation, AppStrings/problem details, and explicit JWT authorization on the new public endpoints without changing JWT issuance; do not rely on Gateway authorization for `/api/auth/*`.
-- Verify no public Gateway route exposes `/internal/*`, no public response includes secret material, and `.env.example` documents only deployment secrets/placeholders.
+- Verify no Gateway route exposes the private gRPC listener/service, no public response includes secret material, and `.env.example` documents only deployment secrets/placeholders.
 - Add Identity service/endpoint/migration tests, including user isolation and ciphertext-at-rest assertions; build and run Identity tests.
 
 ### Step 3: Replace the Worker stub with messaging and dependency infrastructure
@@ -507,7 +510,7 @@ graph LR
 **Outcome:** Worker can consume imported events with controlled concurrency and call Identity/LRCLIB/Redis through testable interfaces.
 
 - Replace `Worker.cs` heartbeat and compose MassTransit RabbitMQ, retry/prefetch, receive-endpoint in-memory outbox, DotNetEnv, HTTP clients, Redis, and `AddLyraAiProviders`.
-- Implement the private Identity client, LRCLIB DTO/client/rate spacing, and Redis result store/unique-owner lock lease.
+- Implement the private Identity gRPC client, LRCLIB DTO/client/rate spacing, and Redis result store/unique-owner lock lease.
 - Add appsettings and `.env.example` values without provider fallback keys.
 - Add client/store unit and container-backed tests for status mapping, encoding, throttling, result payload, and lock lifecycle.
 

@@ -35,6 +35,8 @@ No service-specific logic lives here — only contracts.
 
 - Handles user registration and login.
 - Issues JWTs containing `sub` / `userId` claims consumed by downstream services.
+- Stores each user's encrypted AI-provider connection (provider, model, API key, optional OpenCode plan). Public AI settings management is exposed under `/api/auth/ai-connection`.
+- Exposes a private gRPC service over HTTP/2 on port `5004` in Development. Trusted services call `lyra.identity.v1.UserAiConnectionService/GetAiConnection` with `x-lyra-internal-key`; the service is not routed by `Lyra.Gateway`. Non-Development deployments must configure an HTTPS gRPC endpoint.
 - Database: `identity_db` (PostgreSQL).
 
 ### 2.4 `Lyra.Catalog.Api` (ASP.NET Core Web API)
@@ -118,7 +120,8 @@ All PostgreSQL databases run on PostgreSQL 17 using the `pgvector/pgvector:pg17`
 - **RabbitMQ 4** via `MassTransit.RabbitMQ` v8.5.x (Apache 2.0) — the event backbone connecting `Lyra.Catalog.Api`, `Lyra.Enrichment.Worker`, and `Lyra.PlaylistRag.Api`.
 - **Redis 7** via `Microsoft.Extensions.Caching.StackExchangeRedis` — cache-aside layer in `Lyra.Catalog.Api`.
 - **`Microsoft.Extensions.AI`** — abstraction over chat/completion and embedding generation, configured for cloud providers (e.g. Gemini, OpenAI) rather than local inference, due to the 12 GB host RAM constraint.
-- **YARP (`Yarp.ReverseProxy`)** — reverse proxy and routing layer in `Lyra.Gateway`.
+- **YARP (`Yarp.ReverseProxy`)** — public reverse proxy and routing layer in `Lyra.Gateway`.
+- **gRPC over HTTP/2** — private synchronous service-to-service RPC. Protobuf definitions live in `Lyra.Contracts/Protos`; Identity serves the AI-connection lookup on its internal gRPC endpoint, and callers authenticate with `InternalServices:ApiKey`. gRPC is deliberately excluded from Gateway routes.
 - **Secrets & configuration** — all usernames, passwords, and connection strings live in the gitignored repository-root `.env` file (template: `.env.example`). Docker Compose consumes it natively (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`); .NET services load it at startup via `DotNetEnv`, mapping `Section__Key` variables (e.g. `ConnectionStrings__IdentityDb`, `RabbitMq__Password`) onto the standard .NET configuration system. `appsettings.json` contains no credentials, and the Catalog service fails fast at startup if RabbitMQ credentials are not configured.
 
 ## 6. Security Model
@@ -132,4 +135,5 @@ All PostgreSQL databases run on PostgreSQL 17 using the `pgvector/pgvector:pg17`
   - On `/api/auth/refresh`, the presented token is validated and rotated: the old token is marked revoked with `ReplacedByTokenId`, and a new token pair is returned.
   - If an already revoked/rotated token is reused, the service detects token family compromise and immediately revokes all active refresh tokens for that user.
 - **Defense in Depth & Header Stripping:** `Lyra.Gateway` removes client-supplied identity headers (`X-User-Id`, `X-UserId`, `userId`) and rate limits endpoints (strict fixed window for auth, token bucket for APIs). Downstream microservices resolve the authenticated user ID exclusively via `User.GetUserId()`.
+- **Private gRPC:** internal gRPC uses a separate HTTP/2 listener and the `x-lyra-internal-key` metadata credential. Development may use loopback h2c; non-Development startup rejects a non-HTTPS gRPC endpoint. No Gateway route matches the gRPC service path.
 - Playlists are generated and returned only in terms of `LocalTrackId`s — the backend never needs to resolve or return actual audio file locations.
