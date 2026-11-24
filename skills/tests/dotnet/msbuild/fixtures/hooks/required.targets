@@ -1,5 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <HookOrder>$(HookOrder)required;</HookOrder>
-  </PropertyGroup>
-</Project>
