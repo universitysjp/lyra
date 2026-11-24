@@ -9,4 +9,6 @@ public sealed record TrackResponse(
     string? Album,
     int DurationSeconds,
     bool IsEnriched,
+    bool HasLyrics,
+    bool HasSyncedLyrics,
     DateTimeOffset ImportedAt);

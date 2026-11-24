@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 
 import { loginSession, renderApp } from '../test/render';
 import { DEMO_EMAIL, DEMO_PASSWORD, createFakeBackend, seedTracks } from '../test/fakeBackend';
@@ -12,12 +12,17 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search?q=bohemain%20rhapsody', backend, session });
 
-    expect(await screen.findByText(/Closest matches for "bohemain rhapsody"/)).toBeInTheDocument();
     expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
-    expect(screen.queryByText('Sultans of Swing')).not.toBeInTheDocument();
-    expect(backend.requests.some((entry) => entry.startsWith('GET /api/catalog/tracks/search'))).toBe(
-      true,
+    await waitFor(
+      () =>
+        expect(
+          backend.requests.some((entry) => entry.startsWith('GET /api/catalog/tracks/search')),
+        ).toBe(true),
+      { timeout: 2000 },
     );
+    const results = await screen.findByRole('list');
+    expect(within(results).getByText('Bohemian Rhapsody')).toBeInTheDocument();
+    expect(within(results).queryByText('Sultans of Swing')).not.toBeInTheDocument();
   });
 
   it('says so when nothing is close enough', async () => {
@@ -26,7 +31,7 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search?q=zzzzzz', backend, session });
 
-    expect(await screen.findByText('No close matches in your library.')).toBeInTheDocument();
+    expect(await screen.findByText('No matches for “zzzzzz”')).toBeInTheDocument();
   });
 
   it('prompts for a term when the query is empty and calls nothing', async () => {
@@ -35,9 +40,7 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search', backend, session });
 
-    expect(
-      await screen.findByText(/Type something above to search the tracks you synced/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('What do you want to hear?')).toBeInTheDocument();
     expect(
       backend.requests.filter((entry) => entry.startsWith('GET /api/catalog/tracks/search')),
     ).toHaveLength(0);

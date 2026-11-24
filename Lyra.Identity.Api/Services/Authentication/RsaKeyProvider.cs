@@ -80,7 +80,11 @@ public sealed class RsaKeyProvider : IRsaKeyProvider, IDisposable
 
         _signingKey = new RsaSecurityKey(_rsa)
         {
-            KeyId = KeyId
+            KeyId = KeyId,
+            CryptoProviderFactory = new CryptoProviderFactory
+            {
+                CacheSignatureProviders = false
+            }
         };
 
         var publicRsaKey = new RsaSecurityKey(publicParameters)

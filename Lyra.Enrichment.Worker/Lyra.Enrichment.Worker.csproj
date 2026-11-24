@@ -8,13 +8,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.85.0" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.7" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="11.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.*" />
+    <PackageReference Include="StackExchange.Redis" Version="3.4.35" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Lyra.AI\Lyra.AI.csproj" />
     <ProjectReference Include="..\Lyra.Contracts\Lyra.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Lyra.Enrichment.Worker.Tests" />
   </ItemGroup>
 </Project>

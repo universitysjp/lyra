@@ -1,30 +1,44 @@
-// interfaces
 interface IProps {
-  kind?: 'error' | 'info';
+  kind?: 'error' | 'info' | 'success';
   message: string | null;
+  actionLabel?: string;
   onRetry?: () => void;
   onDismiss?: () => void;
 }
 
-/** Inline problem report, mostly surfaced from backend problem+json payloads. */
-const Banner: React.FC<IProps> = ({ kind = 'error', message, onRetry, onDismiss }) => {
+const bannerClass = (kind: NonNullable<IProps['kind']>): string => {
+  if (kind === 'error') {
+    return 'banner banner-error';
+  }
+
+  return kind === 'success' ? 'banner banner-success' : 'banner';
+};
+
+/** Inline status message for errors, confirmations and missing files. */
+const Banner: React.FC<IProps> = ({
+  kind = 'error',
+  message,
+  actionLabel = 'Retry',
+  onRetry,
+  onDismiss,
+}) => {
   if (!message) {
     return null;
   }
 
   return (
-    <div className={kind === 'error' ? 'banner banner-error flex flex-gap flex-v-center' : 'banner flex flex-gap flex-v-center'}>
+    <div className={bannerClass(kind)}>
       <span className='material-symbols-outlined' aria-hidden='true'>
-        {kind === 'error' ? 'report_problem' : 'info'}
+        {kind === 'error' ? 'report_problem' : kind === 'success' ? 'check_circle' : 'info'}
       </span>
       <p>{message}</p>
       {onRetry && (
-        <button type='button' className='button black' onClick={onRetry}>
-          Retry
+        <button type='button' className='btn btn-ghost btn-sm' onClick={onRetry}>
+          {actionLabel}
         </button>
       )}
       {onDismiss && (
-        <button type='button' className='icon-button' onClick={onDismiss} title='Dismiss'>
+        <button type='button' className='icon-btn' onClick={onDismiss} aria-label='Dismiss'>
           <span className='material-symbols-outlined' aria-hidden='true'>
             close
           </span>

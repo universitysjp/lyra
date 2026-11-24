@@ -41,7 +41,8 @@ const MissingMediaNotice: React.FC = () => {
   return (
     <Banner
       kind='info'
-      message={`"${missingMedia.name}" has no audio file on this device yet. Pick the file to play it - it stays local.`}
+      message={`“${missingMedia.name}” needs its file before it can play. Choose it from this device — the audio stays here.`}
+      actionLabel='Choose file'
       onRetry={() => void attach()}
       onDismiss={clearMissingMedia}
     />

@@ -1,22 +1,16 @@
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 
-// components
 import Banner from '../components/Feedback/Banner';
 import MissingMediaNotice from '../components/Media/MissingMediaNotice';
 import Search from '../components/Search/Search';
 import TrackList from '../components/TrackList/TrackList';
 
-// hooks
 import useAttachAudio from '../hooks/useAttachAudio';
 import useFuzzySearch from '../hooks/useFuzzySearch';
 
-// utils
 import { albumGroupId } from '../utils/artwork';
 
-/**
- * Fuzzy search over the caller's own library: GET /api/catalog/tracks/search?q= runs
- * pg_trgm similarity on title and artist, ordered by score, always scoped to the user.
- */
+/** Search across the caller's own library. */
 const SearchPage: React.FC = () => {
   const [params] = useSearchParams();
   const query = params.get('q') ?? '';
@@ -24,42 +18,53 @@ const SearchPage: React.FC = () => {
   const attach = useAttachAudio();
 
   return (
-    <div className='albums flex flex-column flex-gap no-select'>
-      <div className='container flex flex-column flex-gap'>
-        <Search />
+    <div className='page search-page no-select'>
+      <header className='page-head'>
+        <div>
+          <h1 className='page-title'>Search</h1>
+          <p className='page-sub'>Find a song, an artist or a record in your library.</p>
+        </div>
+      </header>
 
-        <section className='flex flex-column flex-gap'>
-          <div className='flex flex-space-between flex-v-center'>
-            <h3>{query ? `Closest matches for "${query}"` : 'Search your library'}</h3>
-            <Link to='/library' className='button black'>
-              Browse all
-            </Link>
-          </div>
+      <Search />
 
-          <p className='muted'>
-            The backend matches on title and artist with a similarity threshold of 0.3, so a typo
-            like <em>bohemain rhapsody</em> still finds <em>Bohemian Rhapsody</em>.
+      <MissingMediaNotice />
+      <Banner message={error} onRetry={retry} />
+
+      {!query.trim() ? (
+        <div className='empty-state'>
+          <span className='material-symbols-outlined' aria-hidden='true'>
+            search
+          </span>
+          <h2>What do you want to hear?</h2>
+          <p>Search the music you have already added. Titles and artists both work.</p>
+        </div>
+      ) : loading ? (
+        <div className='skeleton-list' aria-label='Searching'>
+          {[0, 1, 2].map((row) => (
+            <div key={row} className='skeleton-row' />
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <div className='empty-state'>
+          <span className='material-symbols-outlined' aria-hidden='true'>
+            search_off
+          </span>
+          <h2>No matches for “{query}”</h2>
+          <p>Try a different spelling, the artist name, or another part of the title.</p>
+        </div>
+      ) : (
+        <>
+          <p className='page-sub'>
+            {results.length} {results.length === 1 ? 'result' : 'results'} for “{query}”
           </p>
-
-          <MissingMediaNotice />
-          <Banner message={error} onRetry={retry} />
-
-          {loading ? (
-            <p className='empty'>Searching...</p>
-          ) : (
-            <TrackList
-              tracks={results}
-              onAttach={(track) => void attach(track, results)}
-              albumFor={(track) => albumGroupId(track.artist, track.album)}
-              emptyLabel={
-                query
-                  ? 'No close matches in your library.'
-                  : 'Type something above to search the tracks you synced.'
-              }
-            />
-          )}
-        </section>
-      </div>
+          <TrackList
+            tracks={results}
+            onAttach={(track) => void attach(track, results)}
+            albumFor={(track) => albumGroupId(track.artist, track.album)}
+          />
+        </>
+      )}
     </div>
   );
 };

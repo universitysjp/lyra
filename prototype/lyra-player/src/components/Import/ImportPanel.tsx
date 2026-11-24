@@ -2,10 +2,8 @@ import { useCallback, useState } from 'react';
 
 import Banner from '../Feedback/Banner';
 
-// hooks
 import useLibrary from '../../hooks/useLibrary';
 
-// utils
 import { isAudioFile, pickAudioFiles } from '../../utils/filePicker';
 import { registerLocalAudio } from '../../utils/localAudioStore';
 import { readLocalTrack } from '../../utils/localFiles';
@@ -15,8 +13,8 @@ import { formatDuration } from '../../utils/toolbox';
 import type { LocalTrack } from '../../utils/localFiles';
 
 /**
- * Extracts ID3 metadata from files on this device and posts it to
- * POST /api/catalog/tracks/batch. The audio never leaves the browser.
+ * Reads tags from local audio files and adds them to the library. The files themselves
+ * stay in the browser, and are persisted so the tracks remain playable after a reload.
  */
 const ImportPanel: React.FC = () => {
   const { importTracks, importing, lastImport, error } = useLibrary();
@@ -26,12 +24,11 @@ const ImportPanel: React.FC = () => {
   const [localError, setLocalError] = useState<string | null>(null);
   const [dragging, setDragging] = useState<boolean>(false);
 
-  /** Reads metadata for each dropped or picked file, keeping the list deduplicated by id. */
   const addFiles = useCallback(async (files: File[]): Promise<void> => {
     const audio = files.filter(isAudioFile);
 
     if (audio.length === 0) {
-      setLocalError('No audio files found. Lyra understands MP3, M4A, FLAC, OGG and WAV tags.');
+      setLocalError('No audio files found. Choose MP3, M4A, FLAC, OGG or WAV files.');
 
       return;
     }
@@ -64,8 +61,9 @@ const ImportPanel: React.FC = () => {
       return;
     }
 
-    // Metadata is on the server now; keep the object URLs so those rows become playable.
-    pending.forEach((track) => registerLocalAudio(track.localTrackId, track.objectUrl));
+    pending.forEach((track) =>
+      registerLocalAudio(track.localTrackId, track.objectUrl, track.file),
+    );
     setPending([]);
   }, [importTracks, pending]);
 
@@ -85,22 +83,27 @@ const ImportPanel: React.FC = () => {
         }}
       >
         <span className='material-symbols-outlined' aria-hidden='true'>
-          library_music
+          upload_file
         </span>
+        <h3>Drop your music here</h3>
         <p>
-          Drop local audio files here. Tags are read in your browser with a small ID3 parser, only
-          the metadata is sent to Lyra.
+          Add MP3, M4A, FLAC, OGG or WAV files. Tags are read locally, and the audio never leaves
+          this device.
         </p>
         <div className='flex flex-gap-small flex-v-center'>
           <button
             type='button'
-            className='button black'
+            className='btn btn-primary'
             onClick={() => void pickAudioFiles(true).then(addFiles)}
           >
+            <span className='material-symbols-outlined' aria-hidden='true'>
+              folder_open
+            </span>
             Choose files
           </button>
-          <span className='chip'>
-            {pending.length} queued{reading ? ' - reading tags' : ''}
+          <span className='muted small'>
+            {pending.length} {pending.length === 1 ? 'file' : 'files'} ready
+            {reading ? ' · reading tags' : ''}
           </span>
         </div>
       </div>
@@ -116,7 +119,6 @@ const ImportPanel: React.FC = () => {
               <th scope='col'>Artist</th>
               <th scope='col'>Album</th>
               <th scope='col'>Length</th>
-              <th scope='col'>Source</th>
               <th scope='col'>
                 <span className='sr-only'>Actions</span>
               </th>
@@ -130,15 +132,11 @@ const ImportPanel: React.FC = () => {
                 <td>{track.album ?? 'Single'}</td>
                 <td>{formatDuration(track.durationSeconds)}</td>
                 <td>
-                  <span className={track.source === 'id3' ? 'chip chip-ok' : 'chip'}>
-                    {track.source === 'id3' ? 'ID3 tag' : 'file name'}
-                  </span>
-                </td>
-                <td>
                   <button
                     type='button'
-                    className='icon-button'
+                    className='icon-btn'
                     title={`Remove ${track.title}`}
+                    aria-label={`Remove ${track.title}`}
                     onClick={() =>
                       setPending((current) =>
                         current.filter((item) => item.localTrackId !== track.localTrackId),
@@ -156,42 +154,42 @@ const ImportPanel: React.FC = () => {
         </table>
       )}
 
-      <div className='import-actions flex flex-gap flex-v-center'>
+      <div className='import-actions'>
         <button
           type='button'
-          className='button primary'
-          disabled={pending.length === 0 || importing}
+          className='btn btn-primary'
+          disabled={pending.length === 0 || importing || reading}
           onClick={() => void sync()}
-          title='POST the queued metadata to /api/catalog/tracks/batch'
         >
           <span className='material-symbols-outlined' aria-hidden='true'>
-            cloud_upload
+            library_add
           </span>
-          <span>{importing ? 'Sending batch...' : `Send ${pending.length} track(s) to Lyra`}</span>
+          {importing ? 'Adding…' : `Add ${pending.length || ''} to library`.replace('  ', ' ')}
         </button>
         <button
           type='button'
-          className='button black'
+          className='btn btn-ghost'
           disabled={pending.length === 0 || importing}
           onClick={() => setPending([])}
         >
-          Clear queue
+          Clear
         </button>
-        <span className='chip'>POST /api/catalog/tracks/batch</span>
       </div>
 
-      {pending.length === 0 && (
-        <p className='muted small'>
-          The send button activates once at least one file is queued above.
-        </p>
+      {pending.length === 0 && !lastImport && (
+        <p className='muted small'>Choose files to see them here before adding them.</p>
       )}
 
       {lastImport && (
         <p className='result'>
-          Submitted <strong>{lastImport.submitted}</strong>, imported{' '}
-          <strong>{lastImport.imported}</strong>, duplicates{' '}
-          <strong>{lastImport.duplicates}</strong>. Re-importing the same files shows the
-          fingerprint dedupe.
+          Added <strong>{lastImport.imported}</strong>{' '}
+          {lastImport.imported === 1 ? 'track' : 'tracks'}.
+          {lastImport.duplicates > 0 && (
+            <>
+              {' '}
+              {lastImport.duplicates} already in your library.
+            </>
+          )}
         </p>
       )}
     </section>

@@ -1,6 +1,5 @@
 namespace Lyra.Catalog.Api.Services.Caching;
 
-using System.Globalization;
 using System.Text.Json;
 using Lyra.Catalog.Api.Configuration;
 using Lyra.Catalog.Api.DTOs.Responses;
@@ -15,7 +14,7 @@ public sealed class LibraryCache(
 
     private readonly CatalogOptions _catalog = catalogOptions?.Value ?? new CatalogOptions();
 
-    public async Task<PagedResponse<TrackResponse>?> GetLibraryAsync(
+    public async Task<LibraryCacheLookup> GetLibraryAsync(
         Guid userId, int page, int pageSize, CancellationToken ct)
     {
         var version = await GetVersionAsync(userId, ct);
@@ -24,16 +23,22 @@ public sealed class LibraryCache(
         var json = await cache.GetStringAsync(key, ct);
         if (string.IsNullOrWhiteSpace(json))
         {
-            return null;
+            return new LibraryCacheLookup(version, null);
         }
 
-        return JsonSerializer.Deserialize<PagedResponse<TrackResponse>>(json, SerializerOptions);
+        var response = JsonSerializer.Deserialize<PagedResponse<TrackResponse>>(
+            json,
+            SerializerOptions);
+
+        return new LibraryCacheLookup(version, response);
     }
 
     public async Task SetLibraryAsync(
-        Guid userId, PagedResponse<TrackResponse> response, CancellationToken ct)
+        Guid userId,
+        string version,
+        PagedResponse<TrackResponse> response,
+        CancellationToken ct)
     {
-        var version = await GetVersionAsync(userId, ct);
         var key = BuildLibraryKey(userId, version, response.Page, response.PageSize);
         var options = new DistributedCacheEntryOptions
         {
@@ -47,19 +52,12 @@ public sealed class LibraryCache(
             ct);
     }
 
-    public async Task InvalidateAsync(Guid userId, CancellationToken ct)
-    {
-        var current = await cache.GetStringAsync(BuildVersionKey(userId), ct);
-        var next = long.TryParse(current, NumberStyles.Integer, CultureInfo.InvariantCulture, out var version)
-            ? version + 1
-            : 1;
-
-        await cache.SetStringAsync(
+    public Task InvalidateAsync(Guid userId, CancellationToken ct) =>
+        cache.SetStringAsync(
             BuildVersionKey(userId),
-            next.ToString(CultureInfo.InvariantCulture),
+            Guid.NewGuid().ToString("N"),
             new DistributedCacheEntryOptions(),
             ct);
-    }
 
     private async Task<string> GetVersionAsync(Guid userId, CancellationToken ct) =>
         await cache.GetStringAsync(BuildVersionKey(userId), ct) ?? "0";

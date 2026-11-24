@@ -15,6 +15,8 @@ export interface ITrack {
   duration: string;
   durationSeconds: number;
   isEnriched: boolean;
+  hasLyrics: boolean;
+  hasSyncedLyrics: boolean;
   importedAt: string;
   /** Object URL of the local audio file, empty until the user attaches one. */
   mediaurl: string;

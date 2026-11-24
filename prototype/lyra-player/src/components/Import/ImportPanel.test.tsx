@@ -34,11 +34,25 @@ vi.mock('../../utils/localFiles', () => ({
       objectUrl: `blob:${file.name}`,
       file,
     };
+  }),
+  toLocalTrackId(name: string): string {
+    return name;
   },
-  toLocalTrackId: (name: string): string => name,
-  isImportable: (): boolean => true,
-  probeDuration: async (): Promise<number> => 300,
+  isImportable(): boolean {
+    return true;
+  },
+  async probeDuration(): Promise<number> {
+    return 300;
+  },
 }));
+
+const findImportResult = (pattern: RegExp) =>
+  screen.findByText(
+    (_, element) =>
+      element?.tagName === 'P' &&
+      element.classList.contains('result') &&
+      pattern.test(element.textContent ?? ''),
+  );
 
 describe('ImportPanel', () => {
   let backend: ReturnType<typeof createFakeBackend>;
@@ -50,14 +64,14 @@ describe('ImportPanel', () => {
   const render = async (): Promise<void> => {
     const session = await loginSession(backend, DEMO_EMAIL, DEMO_PASSWORD);
 
-    renderWithProviders(<ImportPanel />, { session });
+    renderWithProviders(<ImportPanel />, { session, backend });
   };
 
   it('keeps the send action disabled until files are queued', async () => {
     await render();
 
-    expect(screen.getByRole('button', { name: /Send 0 track\(s\) to Lyra/ })).toBeDisabled();
-    expect(screen.getByText(/The send button activates once at least one file is queued/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add to library/ })).toBeDisabled();
+    expect(screen.getByText(/Choose files to see them here before adding them/)).toBeInTheDocument();
   });
 
   it('previews extracted tags and sends them as one batch', async () => {
@@ -67,10 +81,9 @@ describe('ImportPanel', () => {
 
     expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
     expect(screen.getByText('Sultans of Swing')).toBeInTheDocument();
-    expect(screen.getByText('file name')).toBeInTheDocument();
-    expect(screen.getByText('05:00')).toBeInTheDocument();
+        expect(screen.getAllByText('05:00')).toHaveLength(2);
 
-    await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Add 2 to library/ }));
 
     await waitFor(() => expect(backend.batchCalls).toHaveLength(1));
 
@@ -78,8 +91,8 @@ describe('ImportPanel', () => {
       'Bohemian Rhapsody',
       'Sultans of Swing',
     ]);
-    expect(await screen.findByText(/Submitted 2, imported 2, duplicates 0/)).toBeInTheDocument();
-    expect(screen.getByText('0 queued')).toBeInTheDocument();
+    expect(await findImportResult(/Added 2 tracks/)).toBeInTheDocument();
+    expect(screen.getByText('0 files ready')).toBeInTheDocument();
   });
 
   it('reports duplicates when the same queue is sent twice', async () => {
@@ -87,13 +100,13 @@ describe('ImportPanel', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Choose files' }));
     await screen.findByText('Bohemian Rhapsody');
-    await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
-    await screen.findByText(/Submitted 2, imported 2, duplicates 0/);
+    await userEvent.click(screen.getByRole('button', { name: /Add 2 to library/ }));
+    await findImportResult(/Added 2 tracks/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Choose files' }));
-    await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Add 2 to library/ }));
 
-    expect(await screen.findByText(/Submitted 2, imported 0, duplicates 2/)).toBeInTheDocument();
+    expect(await findImportResult(/2 already in your library/)).toBeInTheDocument();
   });
 
   it('can drop the queue without sending it', async () => {
@@ -102,9 +115,9 @@ describe('ImportPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose files' }));
     await screen.findByText('Bohemian Rhapsody');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Clear queue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
-    expect(screen.getByText('0 queued')).toBeInTheDocument();
+    expect(screen.getByText('0 files ready')).toBeInTheDocument();
     expect(backend.batchCalls).toHaveLength(0);
   });
 
@@ -117,6 +130,6 @@ describe('ImportPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove Sultans of Swing' }));
 
     expect(screen.queryByText('Sultans of Swing')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Send 1 track\(s\) to Lyra/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Add 1 to library/ })).toBeEnabled();
   });
 });

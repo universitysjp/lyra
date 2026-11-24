@@ -16,6 +16,7 @@ public sealed class AppStringOptions
         public string BatchTooLarge { get; set; } = string.Empty;
         public string InvalidTrackMetadata { get; set; } = string.Empty;
         public string InvalidSearchQuery { get; set; } = string.Empty;
+        public string TrackNotFound { get; set; } = string.Empty;
         public string ValidationFailed { get; set; } = string.Empty;
         public string UnhandledError { get; set; } = string.Empty;
     }

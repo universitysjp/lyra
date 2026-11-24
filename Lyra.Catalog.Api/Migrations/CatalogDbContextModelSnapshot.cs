@@ -56,7 +56,25 @@ namespace Lyra.Catalog.Api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("ResolvedAlbum")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResolvedArtist")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("ResolvedDurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool>("ResolvedInstrumental")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ResolvedTitle")
+                        .HasColumnType("text");
+
                     b.Property<string>("SemanticSummary")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SyncedLyrics")
                         .HasColumnType("text");
 
                     b.Property<string>("Themes")

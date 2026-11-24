@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 
+import { createAiConnectionsApi } from '../api/aiConnections';
 import { createAuthApi } from '../api/auth';
 import { createCatalogApi } from '../api/catalog';
 import { createLyraClient } from '../api/http';
@@ -40,7 +41,12 @@ const ApiProvider: React.FC<IProps> = ({ children, value, session, fetchImpl, on
       onSessionLost: () => lostListener.current?.(),
     });
 
-    return { client, auth: createAuthApi(client), catalog: createCatalogApi(client) };
+    return {
+      client,
+      auth: createAuthApi(client),
+      catalog: createCatalogApi(client),
+      aiConnections: createAiConnectionsApi(client),
+    };
     // The provider is mounted once per app; prop changes intentionally create a new client.
   }, [session, fetchImpl]);
 

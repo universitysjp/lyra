@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import TrackContext from '../contexts/TrackContext';
 import type { ITrackContext } from '../contexts/TrackContext';
+import { hydrateLocalAudio } from '../utils/localAudioStore';
 
 import type { ITrack } from '../types/types';
 
@@ -31,6 +32,11 @@ const TrackProvider: React.FC<IProps> = ({ children }) => {
   const index = currentTrack ? queue.findIndex((item) => item.id === currentTrack.id) : -1;
   const prevTrack = index > 0 ? queue[index - 1] : null;
   const nextTrack = index >= 0 && index < queue.length - 1 ? queue[index + 1] : null;
+
+  // Restore files the user attached in an earlier session so library rows stay playable.
+  useEffect(() => {
+    void hydrateLocalAudio();
+  }, []);
 
   /** Starts a track; without a local file Lyra has nothing to decode. */
   const playTrack = useCallback((track: ITrack, items: ITrack[]): void => {

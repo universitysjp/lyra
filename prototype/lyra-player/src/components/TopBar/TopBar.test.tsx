@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { loginSession, renderApp } from '../../test/render';
@@ -16,16 +16,16 @@ describe('TopBar', () => {
     await screen.findByRole('heading', { name: 'Your library' });
 
     await userEvent.click(screen.getByRole('link', { name: 'Albums' }));
-    expect(await screen.findByRole('heading', { name: 'Albums in your library' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Albums' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('link', { name: 'Search' }));
-    expect(await screen.findByText(/Search your library/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Search' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: 'Sync metadata' }));
-    expect(await screen.findByRole('heading', { name: 'Sync local track metadata' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Add music' }));
+    expect(await screen.findByRole('heading', { name: 'Add music' })).toBeInTheDocument();
   });
 
-  it('shows the remaining access token lifetime', async () => {
+  it('keeps the signed-in account in the sidebar without exposing token state', async () => {
     const backend = createFakeBackend();
     const session = await loginSession(backend, DEMO_EMAIL, DEMO_PASSWORD);
 
@@ -33,9 +33,11 @@ describe('TopBar', () => {
 
     await screen.findByRole('heading', { name: 'Your library' });
 
-    const chip = screen.getByText(/^token /);
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
 
-    expect(chip).toHaveTextContent(/token (0[0-9]|1[0-5]):[0-5][0-9]/);
+    expect(within(sidebar).getByText(DEMO_EMAIL)).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByText(/^token /)).not.toBeInTheDocument();
   });
 
   it('signs out and revokes the refresh token', async () => {

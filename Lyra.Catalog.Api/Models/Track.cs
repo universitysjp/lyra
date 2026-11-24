@@ -23,6 +23,8 @@ public class Track
     // Enrichment data populated by the enrichment milestone and shared across users.
     public string? Lyrics { get; set; }
 
+    public string? SyncedLyrics { get; set; }
+
     public string? PrimaryMood { get; set; }
 
     public string? Themes { get; set; }
@@ -30,4 +32,15 @@ public class Track
     public int? EnergyLevel { get; set; }
 
     public string? SemanticSummary { get; set; }
+
+    // Canonical metadata from the LRCLIB record whose lyrics were selected.
+    public string? ResolvedTitle { get; set; }
+
+    public string? ResolvedArtist { get; set; }
+
+    public string? ResolvedAlbum { get; set; }
+
+    public double? ResolvedDurationSeconds { get; set; }
+
+    public bool ResolvedInstrumental { get; set; }
 }

@@ -16,10 +16,10 @@ describe('LibraryPage', () => {
     expect(await screen.findByRole('heading', { name: 'Your library' })).toBeInTheDocument();
     expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
     expect(screen.getByText('Sultans of Swing')).toBeInTheDocument();
-    expect(screen.getByText('2 synced tracks - 12 minutes on this page')).toBeInTheDocument();
-    expect(screen.getAllByText('metadata only')).toHaveLength(2);
-    expect(screen.getByText('1-2 of 2')).toBeInTheDocument();
-    expect(screen.getByText('page 1 / 1')).toBeInTheDocument();
+    expect(screen.getByText('2 tracks · 12 min on this page')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Link file' })).toHaveLength(2);
+    expect(screen.getByText('1–2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
@@ -29,9 +29,7 @@ describe('LibraryPage', () => {
 
     renderApp({ route: '/library', backend, session });
 
-    expect(
-      await screen.findByText(/No tracks yet\. Sync local files or load the demo batch/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Your library is quiet')).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
@@ -43,11 +41,11 @@ describe('LibraryPage', () => {
 
     await screen.findByText('Bohemian Rhapsody');
 
-    const header = document.querySelector('.topbar') as HTMLElement;
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
 
-    expect(within(header).getByText(DEMO_EMAIL)).toBeInTheDocument();
-    expect(within(header).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
-    expect(within(header).getByText(/^token /)).toBeInTheDocument();
+    expect(within(sidebar).getByText(DEMO_EMAIL)).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByText(/^token /)).not.toBeInTheDocument();
   });
 
   it('routes an anonymous visitor to the login page', async () => {
@@ -55,7 +53,7 @@ describe('LibraryPage', () => {
 
     renderApp({ route: '/library', backend, session: null });
 
-    expect(await screen.findByRole('heading', { name: 'Lyra' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Your music/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Sign in' })).toBeInTheDocument();
   });
 
@@ -74,19 +72,19 @@ describe('LibraryPage', () => {
     renderApp({ route: '/library', backend, session });
 
     expect(await screen.findByText('Track 55')).toBeInTheDocument();
-    expect(screen.getByText('1-50 of 55')).toBeInTheDocument();
-    expect(screen.getByText('page 1 / 2')).toBeInTheDocument();
+    expect(screen.getByText('1–50 of 55')).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-    expect(await screen.findByText('51-55 of 55')).toBeInTheDocument();
-    expect(screen.getByText('page 2 / 2')).toBeInTheDocument();
+    expect(await screen.findByText('51–55 of 55')).toBeInTheDocument();
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
     expect(screen.queryByText('Track 50')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled();
 
     await userEvent.click(screen.getByRole('button', { name: 'Previous' }));
 
-    expect(await screen.findByText('1-50 of 55')).toBeInTheDocument();
+    expect(await screen.findByText('1–50 of 55')).toBeInTheDocument();
   });
 });

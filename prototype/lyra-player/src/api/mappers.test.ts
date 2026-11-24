@@ -21,6 +21,8 @@ const dto = (overrides: Partial<TrackDto> = {}): TrackDto => ({
   album: 'A Night at the Opera',
   durationSeconds: 355,
   isEnriched: false,
+  hasLyrics: false,
+  hasSyncedLyrics: false,
   importedAt: '2026-11-17T10:00:00Z',
   ...overrides,
 });

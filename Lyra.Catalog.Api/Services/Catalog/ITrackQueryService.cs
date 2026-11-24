@@ -9,4 +9,7 @@ public interface ITrackQueryService
 
     Task<IReadOnlyList<TrackResponse>> SearchAsync(
         Guid userId, string query, CancellationToken ct);
+
+    Task<TrackLyricsResponse> GetLyricsAsync(
+        Guid userId, Guid trackId, CancellationToken ct);
 }

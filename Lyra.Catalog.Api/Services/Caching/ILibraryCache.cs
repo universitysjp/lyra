@@ -4,12 +4,15 @@ using Lyra.Catalog.Api.DTOs.Responses;
 
 public interface ILibraryCache
 {
-    Task<PagedResponse<TrackResponse>?> GetLibraryAsync(
+    Task<LibraryCacheLookup> GetLibraryAsync(
         Guid userId, int page, int pageSize, CancellationToken ct);
 
     Task SetLibraryAsync(
-        Guid userId, PagedResponse<TrackResponse> response, CancellationToken ct);
+        Guid userId,
+        string version,
+        PagedResponse<TrackResponse> response,
+        CancellationToken ct);
 
-    /// <summary>Invalidates every cached page for the user by bumping their version counter.</summary>
+    /// <summary>Invalidates every cached page for the user by replacing their version token.</summary>
     Task InvalidateAsync(Guid userId, CancellationToken ct);
 }

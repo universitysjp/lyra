@@ -50,3 +50,26 @@ Content-Type: application/json
 {
   "refreshToken": "{{refreshToken}}"
 }
+
+### Save AI Provider Connection (BYOK)
+# Provider is one of: OpenAI, Gemini, OpenCode, Anthropic.
+# openCodePlan is only allowed for OpenCode (PayAsYouGo, Go).
+PUT {{baseUrl}}/api/auth/ai-connection
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "provider": "Gemini",
+  "model": "gemini-2.5-flash",
+  "apiKey": "PASTE_PROVIDER_API_KEY_HERE",
+  "openCodePlan": null
+}
+
+### Get AI Provider Connection Metadata (never returns the key)
+GET {{baseUrl}}/api/auth/ai-connection
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Delete AI Provider Connection
+DELETE {{baseUrl}}/api/auth/ai-connection
+Authorization: Bearer {{accessToken}}

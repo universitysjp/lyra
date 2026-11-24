@@ -2,6 +2,7 @@
 @email = listener@example.com
 @password = StrongPassword123!
 @accessToken = PASTE_ACCESS_TOKEN_FROM_LOGIN_HERE
+@trackId = PASTE_TRACK_ID_FROM_LIBRARY_RESPONSE
 
 ### 1. Register a user (201 Created)
 POST {{Lyra.Gateway_HostAddress}}/api/auth/register
@@ -58,6 +59,18 @@ Authorization: Bearer {{accessToken}}
 
 ### 5. Fuzzy search by title or artist (200 OK)
 GET {{Lyra.Gateway_HostAddress}}/api/catalog/tracks/search?q=bohemain%20rhapsody
+Authorization: Bearer {{accessToken}}
+
+### 6. After the Worker publishes SongEnrichedEvent, re-list the library
+# The track now returns "isEnriched": true. Enrichment updates every user linked
+# to the same global track and invalidates all of their cached library pages.
+GET {{Lyra.Gateway_HostAddress}}/api/catalog/tracks?page=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### 7. Fetch plain and synced lyrics for an owned track (200 OK)
+# Lyrics can already be present before isEnriched becomes true: the Worker
+# publishes SongLyricsFetchedEvent before it calls the AI provider.
+GET {{Lyra.Gateway_HostAddress}}/api/catalog/tracks/{{trackId}}/lyrics
 Authorization: Bearer {{accessToken}}
 
 ### 6. Re-post the same batch and observe duplicates (202 Accepted)

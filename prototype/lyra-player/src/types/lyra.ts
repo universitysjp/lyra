@@ -43,7 +43,16 @@ export interface TrackDto {
   album: string | null;
   durationSeconds: number;
   isEnriched: boolean;
+  hasLyrics: boolean;
+  hasSyncedLyrics: boolean;
   importedAt: string;
+}
+
+export interface TrackLyricsDto {
+  trackId: string;
+  isEnriched: boolean;
+  plainLyrics: string | null;
+  syncedLyrics: string | null;
 }
 
 export interface PagedResponse<T> {
@@ -51,4 +60,25 @@ export interface PagedResponse<T> {
   page: number;
   pageSize: number;
   totalCount: number;
+}
+
+/** Provider values match Lyra.Contracts.AI.AiProvider and use string JSON enum serialization. */
+export type AiProvider = 'OpenAI' | 'Gemini' | 'OpenCode' | 'Anthropic';
+
+export type OpenCodePlan = 'PayAsYouGo' | 'Go';
+
+/** Metadata returned by Identity; the API key is deliberately never included. */
+export interface AiConnectionDto {
+  provider: AiProvider;
+  model: string;
+  openCodePlan: OpenCodePlan | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertAiConnectionRequest {
+  provider: AiProvider;
+  model: string;
+  apiKey: string;
+  openCodePlan: OpenCodePlan | null;
 }

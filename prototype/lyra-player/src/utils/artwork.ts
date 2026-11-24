@@ -23,8 +23,8 @@ export const artworkFor = (seed: string, initials?: string): string => {
 </defs>
 <rect width="300" height="300" fill="url(#g)"/>
 <circle cx="238" cy="62" r="46" fill="hsla(0,0%,100%,0.08)"/>
-<text x="150" y="172" font-family="'Open Sans',sans-serif" font-size="96" font-weight="700"
-fill="rgba(255,255,255,0.86)" text-anchor="middle">${label.slice(0, 3) || 'Lyra'}</text>
+<text x="150" y="172" font-family="'Manrope','Open Sans',sans-serif" font-size="96" font-weight="800"
+fill="rgba(255,255,255,0.94)" text-anchor="middle">${label.slice(0, 3) || 'Lyra'}</text>
 </svg>`;
 
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

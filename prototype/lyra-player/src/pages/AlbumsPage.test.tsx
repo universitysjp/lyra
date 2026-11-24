@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { loginSession, renderApp } from '../test/render';
@@ -13,14 +13,22 @@ describe('AlbumsPage', () => {
 
     renderApp({ route: '/albums', backend, session });
 
-    expect(await screen.findByRole('heading', { name: 'Albums in your library' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Albums' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByRole('link').filter((link) =>
+        link.getAttribute('href')?.startsWith('/album/'),
+      )).toHaveLength(2),
+    );
 
     const cards = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/album/'));
+    const queenCard = cards.find(
+      (card) => card.getAttribute('href') === '/album/queen%2Fa-night-at-the-opera',
+    );
 
-    expect(cards).toHaveLength(2);
-    expect(within(cards[0]).getByText('A Night at the Opera')).toBeInTheDocument();
+    expect(queenCard).toBeDefined();
+    expect(within(queenCard as HTMLElement).getByText('A Night at the Opera')).toBeInTheDocument();
     expect(cards.map((card) => card.getAttribute('href'))).toContain(
-      '/album/dire-straits/dire-straits',
+      '/album/dire-straits%2Fdire-straits',
     );
   });
 
@@ -34,10 +42,10 @@ describe('AlbumsPage', () => {
 
     await userEvent.click(card);
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'A Night at the Opera' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Queen' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'A Night at the Opera' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Queen' })).toHaveAttribute('href', '/albums');
-    expect(screen.getByText('1 Songs - 6 Minutes')).toBeInTheDocument();
+    expect(screen.getByText('1 track')).toBeInTheDocument();
+    expect(screen.getByText('6 min')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Play Bohemian Rhapsody' })).toBeInTheDocument();
   });
 
@@ -47,16 +55,15 @@ describe('AlbumsPage', () => {
 
     renderApp({ route: '/album/queen%2Fa-night-at-the-opera', backend, session });
 
-    await screen.findByRole('heading', { level: 2, name: 'A Night at the Opera' });
+    await screen.findByRole('heading', { level: 1, name: 'A Night at the Opera' });
 
-    const row = screen.getByText('Bohemian Rhapsody').closest('.track') as HTMLElement;
+    const row = screen.getByText('Bohemian Rhapsody').closest('.track-row') as HTMLElement;
 
-    expect(within(row).getByText('metadata only')).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: 'Attach file' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Link file' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Play or pause this album' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
 
-    expect(await screen.findByText(/has no audio file on this device yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/needs its file before it can play/)).toBeInTheDocument();
   });
 
   it('offers a way back when the album id is unknown', async () => {
@@ -65,7 +72,7 @@ describe('AlbumsPage', () => {
 
     renderApp({ route: '/album/nobody%2Fno-album', backend, session });
 
-    expect(await screen.findByText('Album not found in this library page.')).toBeInTheDocument();
+    expect(await screen.findByText('Album not found')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to albums' })).toHaveAttribute('href', '/albums');
   });
 });

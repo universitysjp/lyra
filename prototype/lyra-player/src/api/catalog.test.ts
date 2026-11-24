@@ -105,9 +105,28 @@ describe('catalog api against the fake gateway', () => {
     expect(page.pageSize).toBe(50);
   });
 
+  it('loads plain and synced lyrics for an owned track', async () => {
+    await catalog.importTracks(batch());
+    const track = backend.tracks[0];
+
+    backend.setLyrics(track.id, {
+      plainLyrics: 'plain line one\nplain line two',
+      syncedLyrics: '[00:01.00] synced line one\n[00:05.50] synced line two',
+    });
+
+    const lyrics = await catalog.getTrackLyrics(track.id);
+
+    expect(lyrics).toMatchObject({
+      trackId: track.id,
+      isEnriched: false,
+      plainLyrics: 'plain line one\nplain line two',
+      syncedLyrics: '[00:01.00] synced line one\n[00:05.50] synced line two',
+    });
+    expect(backend.requests).toContain(`GET /api/catalog/tracks/${track.id}/lyrics`);
+  });
+
   it('finds a track through fuzzy search despite a typo', async () => {
     await catalog.importTracks(batch());
-
     const results = await catalog.searchTracks('bohemain rhapsody');
 
     expect(results).toHaveLength(1);
