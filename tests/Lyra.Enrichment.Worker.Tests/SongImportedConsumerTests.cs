@@ -20,6 +20,7 @@ public class SongImportedConsumerTests
                 request.TrackId,
                 request.UserId,
                 "lyrics",
+                "synced lyrics",
                 "calm",
                 ["ambient"],
                 2,
@@ -37,6 +38,7 @@ public class SongImportedConsumerTests
         Assert.Equal(import.TrackId, published.Context.Message.TrackId);
         Assert.Equal(import.UserId, published.Context.Message.UserId);
         Assert.Equal("lyrics", published.Context.Message.Lyrics);
+        Assert.Equal("synced lyrics", published.Context.Message.SyncedLyrics);
         Assert.Equal(1, fakeService.Calls);
         Assert.False(string.IsNullOrWhiteSpace(fakeService.LastSessionId));
     }

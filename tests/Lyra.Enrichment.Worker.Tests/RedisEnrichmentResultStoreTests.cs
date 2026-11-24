@@ -1,5 +1,6 @@
 namespace Lyra.Enrichment.Worker.Tests;
 
+using Lyra.Contracts.Music;
 using Lyra.Enrichment.Worker.Configuration;
 using Lyra.Enrichment.Worker.Models;
 using Lyra.Enrichment.Worker.Services.Caching;
@@ -24,20 +25,24 @@ public class RedisEnrichmentResultStoreTests : IClassFixture<RedisTestFixture>
         var store = CreateStore(TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         var result = new TrackEnrichmentResult(
             "some lyrics",
+            "some synced lyrics",
             "melancholic",
             ["dreamy", "night", "Dreamy"],
             4,
-            "Slow dreamy track with a melancholic mood.");
+            "Slow dreamy track with a melancholic mood.",
+            new ResolvedTrackMetadata("Resolved", "Artist", "Album", 214, false));
 
         await store.SetAsync(trackId, result, CancellationToken.None);
         var loaded = await store.GetAsync(trackId, CancellationToken.None);
 
         Assert.NotNull(loaded);
         Assert.Equal(result.Lyrics, loaded.Lyrics);
+        Assert.Equal(result.SyncedLyrics, loaded.SyncedLyrics);
         Assert.Equal(result.PrimaryMood, loaded.PrimaryMood);
         Assert.Equal(result.Themes, loaded.Themes);
         Assert.Equal(result.EnergyLevel, loaded.EnergyLevel);
         Assert.Equal(result.SemanticSummary, loaded.SemanticSummary);
+        Assert.Equal(result.ResolvedMetadata, loaded.ResolvedMetadata);
 
         var database = _fixture.Redis.GetDatabase();
         var raw = await database.StringGetAsync(

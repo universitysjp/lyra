@@ -15,6 +15,7 @@ import LoginPage from '../pages/LoginPage';
 import ImportPage from '../pages/ImportPage';
 import LibraryPage from '../pages/LibraryPage';
 import SearchPage from '../pages/SearchPage';
+import SettingsPage from '../pages/SettingsPage';
 
 /** Blocks the player UI until the session is validated against the Identity API. */
 const RequireAuth: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -52,6 +53,7 @@ const Navigation: React.FC = () => (
       <Route path='/album/:id' element={<AlbumPage />} />
       <Route path='/search' element={<SearchPage />} />
       <Route path='/import' element={<ImportPage />} />
+      <Route path='/settings' element={<SettingsPage />} />
       <Route path='*' element={<Navigate to='/library' replace />} />
     </Route>
   </Routes>

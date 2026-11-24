@@ -52,6 +52,23 @@ public class LrclibRequestThrottleTests
         await next.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
+    [Fact]
+    public async Task Pause_BlocksRequestsUntilRetryAfterElapses()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var throttle = CreateThrottle(clock, 0);
+
+        throttle.Pause(TimeSpan.FromSeconds(2));
+        var next = throttle.WaitAsync(CancellationToken.None);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1999));
+        await Task.Yield();
+        Assert.False(next.IsCompleted);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        await next.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
     private static LrclibRequestThrottle CreateThrottle(
         TimeProvider clock,
         int intervalMilliseconds) =>

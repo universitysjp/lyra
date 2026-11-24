@@ -47,6 +47,14 @@ const ImportPage: React.FC = () => {
             outbox.
           </p>
 
+          <p className='muted'>
+            Enrichment uses your own AI provider and API key.{' '}
+            <Link to='/settings' className='underline'>
+              Configure the AI provider
+            </Link>{' '}
+            before syncing if you want mood, themes and energy extracted.
+          </p>
+
           {error && <p className='banner banner-error'>{error}</p>}
           {sampleError && <p className='banner banner-error'>{sampleError}</p>}
 

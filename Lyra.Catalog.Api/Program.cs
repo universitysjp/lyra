@@ -1,5 +1,6 @@
 using DotNetEnv;
 using Lyra.Catalog.Api.Configuration;
+using Lyra.Catalog.Api.Consumers;
 using Lyra.Catalog.Api.Data;
 using Lyra.Catalog.Api.Endpoints;
 using Lyra.Catalog.Api.Middleware;
@@ -62,6 +63,10 @@ builder.Services.AddMassTransit(bus =>
         outbox.UsePostgres();
         outbox.UseBusOutbox();
     });
+    bus.AddConsumer<SongEnrichedConsumer>();
+    bus.AddConsumer<SongLyricsFetchedConsumer>();
+    bus.AddConfigureEndpointsCallback((context, _, endpoint) =>
+        endpoint.UseEntityFrameworkOutbox<CatalogDbContext>(context));
 
     if (builder.Environment.IsEnvironment("Testing"))
     {
@@ -87,6 +92,8 @@ builder.Services.AddScoped<ITrackRepository, TrackRepository>();
 builder.Services.AddScoped<ILibraryCache, LibraryCache>();
 builder.Services.AddScoped<ITrackIngestionService, TrackIngestionService>();
 builder.Services.AddScoped<ITrackQueryService, TrackQueryService>();
+builder.Services.AddScoped<ITrackEnrichmentService, TrackEnrichmentService>();
+builder.Services.AddScoped<ITrackLyricsService, TrackLyricsService>();
 
 // 5. API configuration
 builder.Services.AddOpenApi();

@@ -25,15 +25,18 @@ public sealed class TrackQueryService(
             : Math.Min(pageSize, _catalog.MaxPageSize);
 
         var cached = await libraryCache.GetLibraryAsync(userId, page, pageSize, ct);
-        if (cached is not null)
+        if (cached.Response is not null)
         {
-            return cached;
+            return cached.Response;
         }
 
         var (items, totalCount) = await repository.GetPagedAsync(userId, page, pageSize, ct);
         var response = new PagedResponse<TrackResponse>(items, page, pageSize, totalCount);
 
-        await libraryCache.SetLibraryAsync(userId, response, ct);
+        // Reuse the version from the miss. If an import invalidated the cache while
+        // the database query was running, this stale response remains under the old
+        // version and can never be served as current.
+        await libraryCache.SetLibraryAsync(userId, cached.Version, response, ct);
 
         return response;
     }
@@ -53,4 +56,9 @@ public sealed class TrackQueryService(
             _catalog.MaxPageSize,
             ct);
     }
+
+    public async Task<TrackLyricsResponse> GetLyricsAsync(
+        Guid userId, Guid trackId, CancellationToken ct) =>
+        await repository.GetLyricsAsync(userId, trackId, ct)
+        ?? throw new NotFoundException(_strings.Errors.TrackNotFound);
 }

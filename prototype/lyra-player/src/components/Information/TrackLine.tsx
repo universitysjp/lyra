@@ -25,7 +25,12 @@ const TrackLine: React.FC<IProps> = ({
         : 'track flex flex-gap flex-v-center flex-space-between active-opacity'
     }
   >
-    <button type='button' onClick={onPlay} title={playing ? `Pause ${track.name}` : `Play ${track.name}`}>
+    <button
+      type='button'
+      onClick={onPlay}
+      title={playing ? `Pause ${track.name}` : `Play ${track.name}`}
+      aria-label={playing ? `Pause ${track.name}` : `Play ${track.name}`}
+    >
       {selected && playing ? (
         <span className='flex flex-h-center flex-v-center track-number material-symbols-outlined'>
           pause
@@ -48,7 +53,15 @@ const TrackLine: React.FC<IProps> = ({
         <span className={track.mediaurl ? 'chip chip-ok' : 'chip chip-muted'}>
           {track.mediaurl ? 'on device' : 'metadata only'}
         </span>
-        <em>{track.isEnriched ? 'mood + lyrics ready' : 'awaiting enrichment'}</em>
+        <em
+          title={
+            track.isEnriched
+              ? 'Lyrics and AI metadata have been stored for this track'
+              : 'Waiting for the enrichment worker to process this track'
+          }
+        >
+          {track.isEnriched ? 'mood + lyrics ready' : 'awaiting enrichment'}
+        </em>
       </div>
     </div>
 

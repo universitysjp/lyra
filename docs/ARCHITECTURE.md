@@ -16,7 +16,8 @@ This document describes the architecture of the Lyra backend in detail: service 
 Holds shared, immutable `record` definitions for cross-service contracts:
 
 - `SongImportedEvent` — published by `Lyra.Catalog.Api` after a track batch is ingested.
-- `SongEnrichedEvent` — published by `Lyra.Enrichment.Worker` after lyrics + mood/tag extraction completes.
+- `SongLyricsFetchedEvent` — published by `Lyra.Enrichment.Worker` as soon as lyrics are found, before any AI provider call, so Catalog can persist them independently of AI success.
+- `SongEnrichedEvent` — published by `Lyra.Enrichment.Worker` after lyrics + mood/tag extraction completes; includes the resolved LRCLIB metadata (`ResolvedTrackMetadata`).
 - Common DTOs shared across API boundaries where appropriate.
 
 No service-specific logic lives here — only contracts.
@@ -42,7 +43,7 @@ No service-specific logic lives here — only contracts.
 ### 2.4 `Lyra.Catalog.Api` (ASP.NET Core Web API)
 
 - Owns the catalog pipeline entry point and `catalog_db`.
-- **Centralized track store:** a global `tracks` table holds one row per unique track (`TrackFingerprint` unique), and a `user_tracks` link table maps each user to the tracks they own with `LocalTrackId` and `ImportedAt`. Enrichment columns live on the shared `tracks` row, so a track is enriched once for all users.
+- **Centralized track store:** a global `tracks` table holds one row per unique track (`TrackFingerprint` unique), and a `user_tracks` link table maps each user to the tracks they own with `LocalTrackId` and `ImportedAt`. Enrichment columns live on the shared `tracks` row, so a track is enriched once for all users. Resolved LRCLIB metadata is stored in separate `Resolved*` columns because the original local ID3 values may be unreliable; RAG playlist generation can prefer the canonical values.
 - `POST /api/catalog/tracks/batch`:
   - Accepts up to 500 metadata items, validates the whole batch, and collapses in-batch duplicates.
   - Computes a deterministic `TrackFingerprint` (SHA-256 of normalized `Title + Artist + DurationSeconds`) server-side.
@@ -50,27 +51,51 @@ No service-specific logic lives here — only contracts.
   - Writes tracks, links, and outbox messages in one EF Core transaction via the MassTransit EF Core transactional outbox, then returns `202 Accepted`.
 - `GET /api/catalog/tracks`: paged, newest-first user library, served cache-aside from Redis.
 - `GET /api/catalog/tracks/search?q=`: fuzzy title/artist search using PostgreSQL `pg_trgm` `similarity(...)`, ordered by score and always joined through `user_tracks`.
+- `GET /api/catalog/tracks/{trackId}/lyrics`: returns `IsEnriched`, `PlainLyrics`, and `SyncedLyrics` for one track the caller owns. A track owned by another user returns `404`.
+- `TrackResponse` exposes `HasLyrics` / `HasSyncedLyrics` flags so list pages stay small while the player can fetch lyrics lazily.
 - Redis cache-aside:
   - Library pages are keyed `catalog:tracks:{userId}:v{version}:p{page}:s{pageSize}`.
   - Each import bumps the per-user `catalog:tracks:{userId}:ver` counter, invalidating every cached page with one write instead of key scanning.
   - Search results are never cached.
 - Uses PostgreSQL `pg_trgm` GIN indexes on `tracks.Title` and `tracks.Artist` for fuzzy matching.
-- Consumes `SongEnrichedEvent` in a later milestone to mark tracks as enriched and invalidate the relevant cache entries.
+- Consumes `SongLyricsFetchedEvent` to persist lyrics before AI enrichment completes:
+  - Updates `Lyrics` and `SyncedLyrics` on the shared track row without changing `IsEnriched`, and stores the selected LRCLIB record's resolved title, artist, album, duration, and instrumental flag.
+  - Preserves an existing non-null value when a later event carries only one form.
+  - Invalidates the linked users' library caches so the new `HasLyrics` flags are visible.
+- Consumes `SongEnrichedEvent` to apply the first successful global enrichment:
+  - Validates the payload, writes `Lyrics`, `PrimaryMood`, `ThemesJson`, `EnergyLevel`, and `SemanticSummary` onto the shared track row, and sets `IsEnriched`.
+  - The repository update is conditional on the track still being unenriched, so two users importing the same track cannot overwrite each other's accepted result. The consumer still saves its inbox row for duplicates.
+  - Invalidates the Redis library version token of every user linked to that track, not just the user who triggered enrichment.
 - Database: `catalog_db` (PostgreSQL).
 
 ### 2.5 `Lyra.Enrichment.Worker` (Background Worker Service)
 
 - A stateless MassTransit consumer of `SongImportedEvent`.
 - Configured with low concurrency (`PrefetchCount = 3`) and exponential retry to respect external API rate limits.
+- Resolves the importing user's AI provider over Identity's private gRPC endpoint (`GetAiConnection`) and builds an `IChatClient` through `Lyra.AI`, **after** lyrics have been fetched and published.
 - Processing pipeline per message:
-  1. **Lyrics lookup:** `GET https://lrclib.net/api/get` for plain lyrics; on `404`, fall back gracefully to metadata-only enrichment.
-  2. **Mood/tag extraction:** Uses `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10) from available lyrics/metadata.
-  3. **Publish:** Emits `SongEnrichedEvent` containing lyrics (if any), extracted tags, and a combined semantic summary string.
+  1. **Lyrics lookup (LRCLIB):**
+     - Normalizes title/artist for the query only; stored metadata is untouched. File extensions (`.mp3`, `.flac`, `.wav`, …), filename/source noise such as `(mp3.pm)`, `[Official Video]`, `- Official Audio`, `(Remastered)`, repeated punctuation, and repeated whitespace are removed.
+     - Calls `GET https://lrclib.net/api/get` with normalized title, artist, duration, and a reliable album name when present. A hit returns both plain and synced (LRC) lyrics plus the record's metadata immediately.
+     - On `404` (or an exact record without lyrics), calls `GET https://lrclib.net/api/v2/search` with the normalized title/artist, scores every valid result, then keeps at most `MaxFuzzyCandidates` (default 25) top-ranked candidates for selection. The beta v2 endpoint returns metadata only (`duration`, `instrumental`, `hasWordSync`, `hasPlainLyrics`, `hasSyncedLyrics`, `hasLyricsfile`), so lyrics bodies are not downloaded during search.
+     - Searches progressively: full artist, then the primary credited artist, then title-only. This handles local libraries where the artist field contains a download site, uploader, or incomplete multi-artist text.
+     - Scores candidates on a 0–100 scale: **title 55%, duration 30%, artist 15%**. Title dominates because local artist metadata is unreliable. Missing/invalid duration scores zero rather than a neutral value.
+     - Ranks by combined score, then title, duration, and artist similarity as deterministic tie-breakers. Candidates below `FuzzyMatchThreshold` (default `85`) are rejected and never fetched. `AmbiguityMargin` no longer exists; the highest-scoring acceptable candidate wins even when the runner-up is close.
+     - Prefers candidates whose v2 flags indicate lyrics are available. Fetches at most `MaxCandidateDetailFetches` (default 3) highest-scoring eligible candidates through `GET /api/get/{id}` until one returns usable plain or synced lyrics.
+     - Other HTTP failures (`408`, `429`, `5xx`, timeouts) raise `LrclibRequestException` so MassTransit retries instead of treating them as "no lyrics". A `429` `Retry-After` delay pauses the shared throttle before the next attempt.
+     - Successful and definitive not-found lookups are cached in `IMemoryCache` (24 h / 6 h defaults) keyed by normalized title, artist, **album**, and duration. Transient failures are never cached.
+     - Structured logs record exact success, exact `404`, search strategy and counts, candidate scores/rejection reasons, lyric-flag skips, selected candidate, detail failures, and external errors — never full lyrics.
+  2. **Persist lyrics first:** If plain or synced lyrics were found, publishes `SongLyricsFetchedEvent` directly through the bus (outside the consumer outbox) before resolving AI credentials or calling the provider. Catalog stores the lyrics and the selected record's canonical metadata (`trackName`, `artistName`, `albumName`, `duration`, `instrumental`) immediately, so a gRPC or provider failure cannot lose them.
+  3. **Mood/tag extraction:** Uses `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10) from available lyrics/metadata.
+  4. **Publish:** Emits `SongEnrichedEvent` containing both lyric forms, the resolved metadata, extracted tags, and a combined semantic summary string.
+- Reuses the lyrics from the lookup in the final event; the LLM prompt receives plain lyrics only. A cached enrichment result that lacks lyrics or resolved metadata is re-checked against LRCLIB so late-arriving lyrics and canonical metadata can be merged without repeating the paid AI call.
+- Uses Redis for its short-lived result cache and per-track locks so duplicate deliveries do not duplicate paid LLM calls.
 - Holds no persistent state of its own; all enrichment output flows downstream via events.
 
 ### 2.6 `Lyra.PlaylistRag.Api` (ASP.NET Core Web API)
 
 - Consumes `SongEnrichedEvent`:
+  - Uses the event's `ResolvedMetadata` (LRCLIB title/artist/album/duration/instrumental) as the canonical track shape for embedding summaries and later playlist filters, while keeping the user's `LocalTrackId` for playback.
   - Generates vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`) from the semantic summary.
   - Upserts embeddings into PostgreSQL using `pgvector`, with an `HNSW` cosine-distance index.
 - `POST /api/playlists/generate`:
@@ -88,6 +113,10 @@ Mobile Client
    ▼
 Lyra.Catalog.Api ──SongImportedEvent──▶ RabbitMQ ──▶ Lyra.Enrichment.Worker
    ▲                                                        │
+   │                                   SongLyricsFetchedEvent│ (before AI)
+   │                                                        ▼
+   │                                          Lyra.Catalog.Api (lyrics stored)
+   │                                                        │
    │                                                        │ SongEnrichedEvent
    │                                                        ▼
    └───────────── SongEnrichedEvent ◀── RabbitMQ ◀── Lyra.PlaylistRag.Api
@@ -95,7 +124,7 @@ Lyra.Catalog.Api ──SongImportedEvent──▶ RabbitMQ ──▶ Lyra.Enrich
                                                embeddings upserted into vector_db
 ```
 
-- `Lyra.Catalog.Api` and `Lyra.PlaylistRag.Api` both consume `SongEnrichedEvent` independently (fan-out via separate queues/subscriptions), each updating its own database.
+- `Lyra.Catalog.Api` consumes `SongLyricsFetchedEvent` (lyrics only, not enriched) and `SongEnrichedEvent` (full enrichment). `Lyra.PlaylistRag.Api` consumes `SongEnrichedEvent` independently.
 
 **Catalog ingestion and the outbox**
 
@@ -103,7 +132,9 @@ The catalog never publishes directly from the request thread while the transacti
 
 **Catalog cache invalidation**
 
-A successful batch import bumps the caller's `catalog:tracks:{userId}:ver` counter after the commit. Every cached library page embeds that version in its key, so one counter increment makes all of the user's pages unreachable without scanning or deleting individual keys. Fuzzy search bypasses the cache entirely. When the enrichment milestone starts flipping `tracks.IsEnriched`, it must bump the same per-user versions for every user linked to the enriched track.
+A successful batch import bumps the caller's `catalog:tracks:{userId}:ver` counter after the commit. Every cached library page embeds that version in its key, so one counter increment makes all of the user's pages unreachable without scanning or deleting individual keys. Fuzzy search bypasses the cache entirely.
+
+`SongLyricsFetchedEvent` bumps the same per-user version tokens when it newly stores lyrics, so the `HasLyrics` / `HasSyncedLyrics` flags refresh in cached library pages. `SongEnrichedEvent` invalidation follows the same mechanism. After an enrichment is applied (or detected as a duplicate), the consumer looks up every user linked to the track and bumps each user's version token. Because the track row is global, one accepted enrichment becomes visible to all owners of that track without fetching their pages or scanning their cache keys.
 
 ## 4. Data Stores
 
@@ -136,4 +167,5 @@ All PostgreSQL databases run on PostgreSQL 17 using the `pgvector/pgvector:pg17`
   - If an already revoked/rotated token is reused, the service detects token family compromise and immediately revokes all active refresh tokens for that user.
 - **Defense in Depth & Header Stripping:** `Lyra.Gateway` removes client-supplied identity headers (`X-User-Id`, `X-UserId`, `userId`) and rate limits endpoints (strict fixed window for auth, token bucket for APIs). Downstream microservices resolve the authenticated user ID exclusively via `User.GetUserId()`.
 - **Private gRPC:** internal gRPC uses a separate HTTP/2 listener and the `x-lyra-internal-key` metadata credential. Development may use loopback h2c; non-Development startup rejects a non-HTTPS gRPC endpoint. No Gateway route matches the gRPC service path.
+- **Per-user AI credentials (BYOK):** AI provider keys are accepted only through the authenticated `/api/auth/ai-connection` endpoints, encrypted with ASP.NET Core Data Protection using the `Lyra.Identity.UserAiConnection.v1` purpose, and stored in `identity_db`. API responses expose provider/model/plan metadata but never the key. The Worker receives the decrypted key only over the private authenticated gRPC call and keeps no persistent copy.
 - Playlists are generated and returned only in terms of `LocalTrackId`s — the backend never needs to resolve or return actual audio file locations.

@@ -34,11 +34,25 @@ vi.mock('../../utils/localFiles', () => ({
       objectUrl: `blob:${file.name}`,
       file,
     };
+  }),
+  toLocalTrackId(name: string): string {
+    return name;
   },
-  toLocalTrackId: (name: string): string => name,
-  isImportable: (): boolean => true,
-  probeDuration: async (): Promise<number> => 300,
+  isImportable(): boolean {
+    return true;
+  },
+  async probeDuration(): Promise<number> {
+    return 300;
+  },
 }));
+
+const findImportResult = (pattern: RegExp) =>
+  screen.findByText(
+    (_, element) =>
+      element?.tagName === 'P' &&
+      element.classList.contains('result') &&
+      pattern.test(element.textContent ?? ''),
+  );
 
 describe('ImportPanel', () => {
   let backend: ReturnType<typeof createFakeBackend>;
@@ -50,7 +64,7 @@ describe('ImportPanel', () => {
   const render = async (): Promise<void> => {
     const session = await loginSession(backend, DEMO_EMAIL, DEMO_PASSWORD);
 
-    renderWithProviders(<ImportPanel />, { session });
+    renderWithProviders(<ImportPanel />, { session, backend });
   };
 
   it('keeps the send action disabled until files are queued', async () => {
@@ -67,8 +81,8 @@ describe('ImportPanel', () => {
 
     expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
     expect(screen.getByText('Sultans of Swing')).toBeInTheDocument();
-    expect(screen.getByText('file name')).toBeInTheDocument();
-    expect(screen.getByText('05:00')).toBeInTheDocument();
+    expect(screen.getAllByText('file name')).toHaveLength(2);
+    expect(screen.getAllByText('05:00')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
 
@@ -78,7 +92,7 @@ describe('ImportPanel', () => {
       'Bohemian Rhapsody',
       'Sultans of Swing',
     ]);
-    expect(await screen.findByText(/Submitted 2, imported 2, duplicates 0/)).toBeInTheDocument();
+    expect(await findImportResult(/Submitted 2, imported 2, duplicates 0/)).toBeInTheDocument();
     expect(screen.getByText('0 queued')).toBeInTheDocument();
   });
 
@@ -88,12 +102,12 @@ describe('ImportPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose files' }));
     await screen.findByText('Bohemian Rhapsody');
     await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
-    await screen.findByText(/Submitted 2, imported 2, duplicates 0/);
+    await findImportResult(/Submitted 2, imported 2, duplicates 0/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Choose files' }));
     await userEvent.click(screen.getByRole('button', { name: /Send 2 track\(s\) to Lyra/ }));
 
-    expect(await screen.findByText(/Submitted 2, imported 0, duplicates 2/)).toBeInTheDocument();
+    expect(await findImportResult(/Submitted 2, imported 0, duplicates 2/)).toBeInTheDocument();
   });
 
   it('can drop the queue without sending it', async () => {

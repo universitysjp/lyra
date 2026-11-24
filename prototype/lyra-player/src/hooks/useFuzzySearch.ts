@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { describeError, isAbortError } from '../api/errors';
-import { toTracks } from '../api/mappers';
+import { toTracks, withLocalAudio } from '../api/mappers';
 import useApi from './useApi';
+import useLocalAudioVersion from './useLocalAudioVersion';
 
 import type { ISearchState } from '../types/types';
 
@@ -15,6 +16,7 @@ export const SEARCH_DEBOUNCE_MS = 400;
  */
 const useFuzzySearch = (query: string): ISearchState & { retry: () => void } => {
   const { catalog } = useApi();
+  const audioVersion = useLocalAudioVersion();
   const [state, setState] = useState<ISearchState>({
     query: '',
     results: [],
@@ -62,7 +64,16 @@ const useFuzzySearch = (query: string): ISearchState & { retry: () => void } => 
     };
   }, [catalog, query, attempt]);
 
-  return { ...state, retry: () => setAttempt((value) => value + 1) };
+  const localizedResults = useMemo(
+    () => withLocalAudio(state.results),
+    [state.results, audioVersion],
+  );
+
+  return {
+    ...state,
+    results: localizedResults,
+    retry: () => setAttempt((value) => value + 1),
+  };
 };
 
 export default useFuzzySearch;

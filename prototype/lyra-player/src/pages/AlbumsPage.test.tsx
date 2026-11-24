@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { loginSession, renderApp } from '../test/render';
@@ -14,13 +14,21 @@ describe('AlbumsPage', () => {
     renderApp({ route: '/albums', backend, session });
 
     expect(await screen.findByRole('heading', { name: 'Albums in your library' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByRole('link').filter((link) =>
+        link.getAttribute('href')?.startsWith('/album/'),
+      )).toHaveLength(2),
+    );
 
     const cards = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/album/'));
+    const queenCard = cards.find(
+      (card) => card.getAttribute('href') === '/album/queen%2Fa-night-at-the-opera',
+    );
 
-    expect(cards).toHaveLength(2);
-    expect(within(cards[0]).getByText('A Night at the Opera')).toBeInTheDocument();
+    expect(queenCard).toBeDefined();
+    expect(within(queenCard as HTMLElement).getByText('A Night at the Opera')).toBeInTheDocument();
     expect(cards.map((card) => card.getAttribute('href'))).toContain(
-      '/album/dire-straits/dire-straits',
+      '/album/dire-straits%2Fdire-straits',
     );
   });
 

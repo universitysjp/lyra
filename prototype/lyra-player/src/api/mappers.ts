@@ -21,6 +21,8 @@ export const toTrack = (dto: TrackDto, no: number): ITrack => {
     duration: formatDuration(dto.durationSeconds),
     durationSeconds: dto.durationSeconds,
     isEnriched: dto.isEnriched,
+    hasLyrics: dto.hasLyrics,
+    hasSyncedLyrics: dto.hasSyncedLyrics,
     importedAt: dto.importedAt,
     mediaurl: localAudioUrl(dto.localTrackId),
     artwork: artworkFor(`${dto.artist}::${album}`, album === SINGLES_LABEL ? dto.artist : album),

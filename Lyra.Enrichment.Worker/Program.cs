@@ -102,7 +102,14 @@ if (workerOptions.PrefetchCount <= 0
 }
 
 if (lrclibOptions.RequestTimeoutSeconds <= 0
-    || lrclibOptions.MinRequestIntervalMilliseconds < 0)
+    || lrclibOptions.MinRequestIntervalMilliseconds < 0
+    || lrclibOptions.MaxFuzzyCandidates <= 0
+    || lrclibOptions.MaxCandidateDetailFetches <= 0
+    || lrclibOptions.FuzzyMatchThreshold is <= 0 or > 100
+    || lrclibOptions.DurationToleranceSeconds <= 0
+    || lrclibOptions.SuccessCacheMinutes < 0
+    || lrclibOptions.NotFoundCacheMinutes < 0
+    || string.IsNullOrWhiteSpace(lrclibOptions.UserAgent))
 {
     throw new InvalidOperationException("LRCLIB options are invalid.");
 }
@@ -163,9 +170,11 @@ builder.Services.AddSingleton<IUserAiConnectionClient, IdentityUserAiConnectionC
 // 4. Enrichment pipeline
 builder.Services.AddScoped<ITrackAnalysisService, TrackAnalysisService>();
 builder.Services.AddScoped<ITrackEnrichmentService, TrackEnrichmentService>();
+builder.Services.AddScoped<ILyricsFetchedPublisher, MassTransitLyricsFetchedPublisher>();
 
 // 5. External services and caching
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(redisConnectionString));
 builder.Services.AddSingleton<IEnrichmentResultStore, RedisEnrichmentResultStore>();
@@ -175,6 +184,7 @@ builder.Services.AddHttpClient<ILyricsClient, LrclibLyricsClient>((serviceProvid
     var options = serviceProvider.GetRequiredService<IOptions<LrclibOptions>>().Value;
     httpClient.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
     httpClient.Timeout = TimeSpan.FromSeconds(options.RequestTimeoutSeconds);
+    httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", options.UserAgent);
 });
 
 // 6. Provider-neutral AI clients (created per user request)

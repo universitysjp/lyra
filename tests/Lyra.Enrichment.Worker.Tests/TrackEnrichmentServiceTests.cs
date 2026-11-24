@@ -3,8 +3,10 @@ namespace Lyra.Enrichment.Worker.Tests;
 using Lyra.AI;
 using Lyra.Contracts.AI;
 using Lyra.Contracts.Events;
+using Lyra.Contracts.Music;
 using Lyra.Enrichment.Worker.Models;
 using Lyra.Enrichment.Worker.Services.Enrichment;
+using Lyra.Enrichment.Worker.Services.Lyrics;
 using Lyra.Enrichment.Worker.Tests.TestDoubles;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -41,25 +43,41 @@ public class TrackEnrichmentServiceTests
         var connectionClient = new FakeUserAiConnectionClient((_, _) =>
             Task.FromResult(Connection()));
         const string fullLyrics = "full plain lyrics that must remain intact";
+        var metadata = new ResolvedTrackMetadata(
+            "Resolved Title",
+            "Resolved Artist",
+            "Resolved Album",
+            214,
+            Instrumental: false);
         var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
-            Task.FromResult<string?>(fullLyrics));
+            Task.FromResult(new LyricsResult(fullLyrics, "synced lyrics", metadata)));
         var analysisService = new FakeTrackAnalysisService((_, _, _, _) =>
             Task.FromResult(new TrackAnalysis("melancholic", ["night", "loss"], 3)));
+        var publisher = new FakeLyricsFetchedPublisher();
         var service = CreateService(
             store,
             connectionClient,
             lyricsClient,
-            analysisService);
+            analysisService,
+            publisher);
 
         var result = await service.EnrichAsync(Import(), "session-1", CancellationToken.None);
 
         Assert.Equal(fullLyrics, result.Lyrics);
+        Assert.Equal("synced lyrics", result.SyncedLyrics);
+        Assert.Equal(metadata, result.ResolvedMetadata);
         Assert.Equal("melancholic", result.PrimaryMood);
         Assert.Equal(["night", "loss"], result.Themes);
         Assert.Equal(3, result.EnergyLevel);
         Assert.Equal(1, store.SetCalls);
         Assert.NotNull(store.LastSetResult);
         Assert.Equal(fullLyrics, store.LastSetResult.Lyrics);
+        Assert.Equal("synced lyrics", store.LastSetResult.SyncedLyrics);
+        Assert.Equal(metadata, store.LastSetResult.ResolvedMetadata);
+        var publishedLyrics = Assert.Single(publisher.Published);
+        Assert.Equal(fullLyrics, publishedLyrics.Lyrics);
+        Assert.Equal("synced lyrics", publishedLyrics.SyncedLyrics);
+        Assert.Equal(metadata, publishedLyrics.ResolvedMetadata);
         Assert.Equal(SemanticSummaryBuilder.Build(
             "Song Title",
             "Artist",
@@ -80,7 +98,7 @@ public class TrackEnrichmentServiceTests
     {
         var store = new FakeEnrichmentResultStore();
         var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
-            Task.FromResult<string?>(null));
+            Task.FromResult(LyricsResult.Empty));
         var analysisService = new FakeTrackAnalysisService((request, _, _, _) =>
         {
             Assert.Null(request.Lyrics);
@@ -115,7 +133,32 @@ public class TrackEnrichmentServiceTests
     }
 
     [Fact]
-    public async Task EnrichAsync_AnalysisFailureDoesNotCacheAndReleasesLock()
+    public async Task EnrichAsync_ConnectionFailureStillPublishesLyricsBeforeFailing()
+    {
+        var store = new FakeEnrichmentResultStore();
+        var connectionClient = new FakeUserAiConnectionClient((_, _) =>
+            throw new InvalidOperationException("gRPC is unavailable"));
+        var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
+            Task.FromResult(new LyricsResult("plain lyrics", "synced lyrics")));
+        var publisher = new FakeLyricsFetchedPublisher();
+        var service = CreateService(
+            store,
+            connectionClient,
+            lyricsClient,
+            publisher: publisher);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.EnrichAsync(Import(), "session-1", CancellationToken.None));
+
+        var published = Assert.Single(publisher.Published);
+        Assert.Equal("plain lyrics", published.Lyrics);
+        Assert.Equal("synced lyrics", published.SyncedLyrics);
+        Assert.Equal(0, store.SetCalls);
+        Assert.Equal(1, store.LockDisposals);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_AnalysisFailureStillPublishesLyrics()
     {
         var store = new FakeEnrichmentResultStore();
         var analysisService = new FakeTrackAnalysisService((_, _, _, _) =>
@@ -125,11 +168,16 @@ public class TrackEnrichmentServiceTests
                 isTransient: true,
                 "Provider unavailable.",
                 nameof(AiProviderException)));
-        var service = CreateService(store, analysisService: analysisService);
+        var publisher = new FakeLyricsFetchedPublisher();
+        var service = CreateService(
+            store,
+            analysisService: analysisService,
+            publisher: publisher);
 
         await Assert.ThrowsAsync<AiProviderException>(
             () => service.EnrichAsync(Import(), "session-1", CancellationToken.None));
 
+        Assert.Single(publisher.Published);
         Assert.Equal(0, store.SetCalls);
         Assert.Equal(1, store.LockDisposals);
         Assert.Null(store.CachedResult);
@@ -155,20 +203,98 @@ public class TrackEnrichmentServiceTests
         Assert.Equal(0, store.SetCalls);
     }
 
+    [Fact]
+    public async Task EnrichAsync_CachedResultWithoutLyricsFetchesAndMergesLateLyrics()
+    {
+        var store = new FakeEnrichmentResultStore
+        {
+            CachedResult = Cached(null, "calm", ["ambient"], 2)
+        };
+        var connectionClient = new FakeUserAiConnectionClient((_, _) =>
+            throw new InvalidOperationException("AI must not be called for a cached result"));
+        var analysisService = new FakeTrackAnalysisService((_, _, _, _) =>
+            throw new InvalidOperationException("AI must not be called for a cached result"));
+        var metadata = new ResolvedTrackMetadata("Resolved", "Artist", "Album", 214, false);
+        var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
+            Task.FromResult(new LyricsResult("late lyrics", "late synced", metadata)));
+        var publisher = new FakeLyricsFetchedPublisher();
+        var service = CreateService(
+            store,
+            connectionClient,
+            lyricsClient,
+            analysisService,
+            publisher);
+
+        var result = await service.EnrichAsync(Import(), "session-1", CancellationToken.None);
+
+        Assert.Equal("late lyrics", result.Lyrics);
+        Assert.Equal("late synced", result.SyncedLyrics);
+        Assert.Equal(metadata, result.ResolvedMetadata);
+        Assert.Equal(1, store.SetCalls);
+        Assert.Equal(metadata, store.LastSetResult?.ResolvedMetadata);
+        Assert.Equal(metadata, Assert.Single(publisher.Published).ResolvedMetadata);
+        Assert.Equal(0, connectionClient.Calls);
+        Assert.Equal(0, analysisService.Calls);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_CachedLyricsWithoutMetadataBackfillsMetadata()
+    {
+        var store = new FakeEnrichmentResultStore
+        {
+            CachedResult = Cached("cached lyrics", "calm", ["ambient"], 2) with
+            {
+                ResolvedMetadata = null
+            }
+        };
+        var metadata = new ResolvedTrackMetadata("Resolved", "Artist", "Album", 214, false);
+        var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
+            Task.FromResult(new LyricsResult("cached lyrics", null, metadata)));
+        var publisher = new FakeLyricsFetchedPublisher();
+        var service = CreateService(store, lyricsClient: lyricsClient, publisher: publisher);
+
+        var result = await service.EnrichAsync(Import(), "session-1", CancellationToken.None);
+
+        Assert.Equal("cached lyrics", result.Lyrics);
+        Assert.Equal(metadata, result.ResolvedMetadata);
+        Assert.Equal(1, store.SetCalls);
+        Assert.Equal(metadata, Assert.Single(publisher.Published).ResolvedMetadata);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_CachedResultWithoutLyricsStillReturnsWhenNoneAreFound()
+    {
+        var cached = Cached(null, "calm", ["ambient"], 2);
+        var store = new FakeEnrichmentResultStore { CachedResult = cached };
+        var lyricsClient = new FakeLyricsClient((_, _, _, _, _) =>
+            Task.FromResult(LyricsResult.Empty));
+        var publisher = new FakeLyricsFetchedPublisher();
+        var service = CreateService(store, lyricsClient: lyricsClient, publisher: publisher);
+
+        var result = await service.EnrichAsync(Import(), "session-1", CancellationToken.None);
+
+        Assert.Null(result.Lyrics);
+        Assert.Equal("calm", result.PrimaryMood);
+        Assert.Equal(0, store.SetCalls);
+        Assert.Empty(publisher.Published);
+    }
+
     private static TrackEnrichmentService CreateService(
         FakeEnrichmentResultStore store,
         FakeUserAiConnectionClient? connectionClient = null,
         FakeLyricsClient? lyricsClient = null,
-        FakeTrackAnalysisService? analysisService = null) =>
+        FakeTrackAnalysisService? analysisService = null,
+        FakeLyricsFetchedPublisher? publisher = null) =>
         new(
             store,
             connectionClient ?? new FakeUserAiConnectionClient((_, _) =>
                 Task.FromResult(Connection())),
             lyricsClient ?? new FakeLyricsClient((_, _, _, _, _) =>
-                Task.FromResult<string?>("lyrics")),
+                Task.FromResult(new LyricsResult("lyrics", null))),
             analysisService ?? new FakeTrackAnalysisService((_, _, _, _) =>
                 Task.FromResult(new TrackAnalysis("calm", ["ambient"], 2))),
-            new FakeTimeProvider(Now));
+            timeProvider: new FakeTimeProvider(Now),
+            lyricsPublisher: publisher);
 
     private static AiConnectionSecret Connection() =>
         new(AiProvider.OpenAI, "gpt-test", "sk-test", null);
@@ -180,6 +306,7 @@ public class TrackEnrichmentServiceTests
         int energy) =>
         new(
             lyrics,
+            null,
             mood,
             themes,
             energy,
@@ -189,7 +316,8 @@ public class TrackEnrichmentServiceTests
                 "Album",
                 mood,
                 themes,
-                energy));
+                energy),
+            new ResolvedTrackMetadata("Cached Title", "Cached Artist", "Cached Album", 180, false));
 
     private static SongImportedEvent Import() =>
         new(

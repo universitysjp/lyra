@@ -31,6 +31,18 @@ GET {{gatewayUrl}}/api/playlists/ping
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 
+### Save AI Provider Connection through Gateway (BYOK)
+PUT {{gatewayUrl}}/api/auth/ai-connection
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "provider": "Gemini",
+  "model": "gemini-2.5-flash",
+  "apiKey": "PASTE_PROVIDER_API_KEY_HERE",
+  "openCodePlan": null
+}
+
 ### Access Catalog Ping without Token (Expect 401)
 GET {{gatewayUrl}}/api/catalog/ping
 Accept: application/json

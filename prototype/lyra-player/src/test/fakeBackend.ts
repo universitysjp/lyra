@@ -1,4 +1,12 @@
-import type { PagedResponse, TrackDto, TrackMetadataItem } from '../types/lyra';
+import type {
+  AiConnectionDto,
+  AiProvider,
+  OpenCodePlan,
+  PagedResponse,
+  TrackDto,
+  TrackLyricsDto,
+  TrackMetadataItem,
+} from '../types/lyra';
 
 /** Minimal in-memory stand-in for the Lyra gateway, used by the component and hook tests. */
 
@@ -16,6 +24,18 @@ interface TokenPair {
   expiresAt: number;
 }
 
+interface StoredAiConnection {
+  provider: AiProvider;
+  model: string;
+  apiKey: string;
+  openCodePlan: OpenCodePlan | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const AI_PROVIDERS: AiProvider[] = ['OpenAI', 'Gemini', 'OpenCode', 'Anthropic'];
+const OPEN_CODE_PLANS: OpenCodePlan[] = ['PayAsYouGo', 'Go'];
+
 export interface FakeBackendOptions {
   /** Seed a library for the default demo user. */
   tracks?: TrackMetadataItem[];
@@ -27,9 +47,12 @@ export interface FakeBackend {
   fetchImpl: typeof fetch;
   users: StoredUser[];
   tracks: TrackDto[];
+  aiConnections: Map<string, StoredAiConnection>;
+  lyrics: Map<string, TrackLyricsDto>;
   requests: string[];
   batchCalls: TrackMetadataItem[][];
   reset: () => void;
+  setLyrics: (trackId: string, lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>) => void;
 }
 
 export const DEMO_EMAIL = 'listener@example.com';
@@ -70,27 +93,50 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
   const tokens = new Map<string, TokenPair>();
   const refreshIndex = new Map<string, string>();
   const links = new Map<string, Set<string>>();
+  const aiConnections = new Map<string, StoredAiConnection>();
   const tracks: TrackDto[] = [];
   let sequence = 0;
 
   const backend: FakeBackend = {
     users,
     tracks,
+    aiConnections,
+    lyrics: new Map<string, TrackLyricsDto>(),
     requests: [],
     batchCalls: [],
     fetchImpl: undefined as unknown as typeof fetch,
     reset,
+    setLyrics,
   };
 
   function reset(): void {
     tokens.clear();
     refreshIndex.clear();
     links.clear();
+    aiConnections.clear();
+    backend.lyrics.clear();
     tracks.length = 0;
     backend.requests.length = 0;
     backend.batchCalls.length = 0;
 
     (options.tracks ?? []).forEach((item) => upsert(item, users[0].userId));
+  }
+
+  function setLyrics(trackId: string, lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>): void {
+    const track = tracks.find((item) => item.id === trackId);
+
+    if (!track) {
+      return;
+    }
+
+    track.hasLyrics = Boolean(lyrics.plainLyrics || lyrics.syncedLyrics);
+    track.hasSyncedLyrics = Boolean(lyrics.syncedLyrics);
+    backend.lyrics.set(trackId, {
+      trackId,
+      isEnriched: track.isEnriched,
+      plainLyrics: lyrics.plainLyrics,
+      syncedLyrics: lyrics.syncedLyrics,
+    });
   }
 
   function issueTokens(userId: string): TokenPair {
@@ -158,6 +204,8 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       album: item.album ?? null,
       durationSeconds: item.durationSeconds,
       isEnriched: false,
+      hasLyrics: false,
+      hasSyncedLyrics: false,
       importedAt: new Date().toISOString(),
     };
 
@@ -285,6 +333,67 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       return problem(401, 'Unauthorized', 'Access token is missing or expired.');
     }
 
+    if (path === '/api/auth/ai-connection' && method === 'GET') {
+      const stored = aiConnections.get(user.userId);
+
+      return stored
+        ? json(200, aiMetadata(stored))
+        : problem(404, 'Not Found', 'No AI provider connection is configured for this user.');
+    }
+
+    if (path === '/api/auth/ai-connection' && method === 'PUT') {
+      const input = (body ?? {}) as {
+        provider?: AiProvider;
+        model?: string;
+        apiKey?: string;
+        openCodePlan?: OpenCodePlan | null;
+      };
+      const model = input.model?.trim() ?? '';
+      const apiKey = input.apiKey ?? '';
+      const plan = input.openCodePlan ?? null;
+
+      if (!input.provider || !AI_PROVIDERS.includes(input.provider)) {
+        return problem(400, 'Validation Failed', 'The selected AI provider is not supported.');
+      }
+
+      if (!model || model.length > 200) {
+        return problem(400, 'Validation Failed', 'The AI model must be nonblank and no longer than 200 characters.');
+      }
+
+      if (!apiKey.trim() || apiKey.length > 512) {
+        return problem(400, 'Validation Failed', 'The API key must be nonblank and no longer than 512 characters.');
+      }
+
+      if (input.provider === 'OpenCode') {
+        if (!plan || !OPEN_CODE_PLANS.includes(plan)) {
+          return problem(400, 'Validation Failed', 'An OpenCode plan is required for the OpenCode provider.');
+        }
+      } else if (plan !== null) {
+        return problem(400, 'Validation Failed', 'An OpenCode plan is only valid for the OpenCode provider.');
+      }
+
+      const previous = aiConnections.get(user.userId);
+      const now = new Date().toISOString();
+      const stored: StoredAiConnection = {
+        provider: input.provider,
+        model,
+        apiKey,
+        openCodePlan: input.provider === 'OpenCode' ? plan : null,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now,
+      };
+
+      aiConnections.set(user.userId, stored);
+
+      return json(200, aiMetadata(stored));
+    }
+
+    if (path === '/api/auth/ai-connection' && method === 'DELETE') {
+      aiConnections.delete(user.userId);
+
+      return noContent();
+    }
+
     if (path === '/api/catalog/tracks/batch' && method === 'POST') {
       const items = ((body as { tracks?: TrackMetadataItem[] })?.tracks ?? []).slice();
 
@@ -315,6 +424,27 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       });
 
       return json(202, { submitted: items.length, imported, duplicates: items.length - imported });
+    }
+
+    const lyricsMatch = /^\/api\/catalog\/tracks\/([^/]+)\/lyrics$/.exec(path);
+
+    if (lyricsMatch && method === 'GET') {
+      const trackId = decodeURIComponent(lyricsMatch[1] ?? '');
+      const owned = libraryOf(user.userId).some((track) => track.id === trackId);
+
+      if (!owned) {
+        return problem(404, 'Not Found', 'Track not found in this library.');
+      }
+
+      const stored = backend.lyrics.get(trackId);
+      const track = tracks.find((item) => item.id === trackId);
+
+      return json(200, {
+        trackId,
+        isEnriched: track?.isEnriched ?? false,
+        plainLyrics: stored?.plainLyrics ?? null,
+        syncedLyrics: stored?.syncedLyrics ?? null,
+      } satisfies TrackLyricsDto);
     }
 
     if (path === '/api/catalog/tracks' && method === 'GET') {
@@ -388,6 +518,16 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
 
   return backend;
 };
+
+function aiMetadata(stored: StoredAiConnection): AiConnectionDto {
+  return {
+    provider: stored.provider,
+    model: stored.model,
+    openCodePlan: stored.openCodePlan,
+    createdAt: stored.createdAt,
+    updatedAt: stored.updatedAt,
+  };
+}
 
 function fingerprintOf(track: TrackDto): string {
   return `${normalize(track.title)}|${normalize(track.artist)}|${track.durationSeconds}`;

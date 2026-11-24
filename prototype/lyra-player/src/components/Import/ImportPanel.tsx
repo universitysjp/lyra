@@ -64,8 +64,11 @@ const ImportPanel: React.FC = () => {
       return;
     }
 
-    // Metadata is on the server now; keep the object URLs so those rows become playable.
-    pending.forEach((track) => registerLocalAudio(track.localTrackId, track.objectUrl));
+    // Metadata is on the server now; reuse the probe URL and persist the file so
+    // those rows stay playable after a reload.
+    pending.forEach((track) =>
+      registerLocalAudio(track.localTrackId, track.objectUrl, track.file),
+    );
     setPending([]);
   }, [importTracks, pending]);
 

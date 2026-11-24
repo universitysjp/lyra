@@ -1,7 +1,12 @@
 // hooks
 import useTrack from '../../hooks/useTrack';
 
-const Details: React.FC = () => {
+interface IProps {
+  lyricsOpen: boolean;
+  onToggleLyrics: () => void;
+}
+
+const Details: React.FC<IProps> = ({ lyricsOpen, onToggleLyrics }) => {
   const { currentTrack } = useTrack();
 
   if (currentTrack) {
@@ -18,6 +23,18 @@ const Details: React.FC = () => {
             <em>{currentTrack.album}</em>
           </span>
         </div>
+        <button
+          type='button'
+          className={lyricsOpen ? 'lyrics-toggle active' : 'lyrics-toggle'}
+          onClick={onToggleLyrics}
+          title={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
+          aria-label={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
+          aria-pressed={lyricsOpen}
+        >
+          <span className='material-symbols-outlined' aria-hidden='true'>
+            lyrics
+          </span>
+        </button>
       </div>
     );
   }

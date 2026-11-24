@@ -89,7 +89,11 @@ const LoginPage: React.FC = () => {
           </button>
         </div>
 
-        <form className='flex flex-column flex-gap' onSubmit={(event) => void submit(event)}>
+        <form
+          className='flex flex-column flex-gap'
+          noValidate
+          onSubmit={(event) => void submit(event)}
+        >
           <label className='field flex flex-column flex-gap-small'>
             <span>Email</span>
             <input

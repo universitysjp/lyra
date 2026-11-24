@@ -13,20 +13,21 @@ Lyra is a backend microservices platform for an AI-powered local music mobile ap
 
 **Target Framework:** .NET 10.0 (C# 14) using Minimal APIs. Strict database-per-service isolation — **never** share `DbContext` instances or database schemas across services.
 
-1. **`Lyra.Contracts`** (Class Library): Shared immutable `record` definitions for MassTransit events (`SongImportedEvent`, `SongEnrichedEvent`), common DTOs, and protobuf definitions for private service-to-service gRPC contracts.
+1. **`Lyra.Contracts`** (Class Library): Shared immutable `record` definitions for MassTransit events (`SongImportedEvent`, `SongLyricsFetchedEvent`, `SongEnrichedEvent`), common DTOs, and protobuf definitions for private service-to-service gRPC contracts.
 2. **`Lyra.Gateway`** (ASP.NET Core Web App + YARP): Single entry point (`Yarp.ReverseProxy`). Validates JWTs, enforces rate limiting, and routes `/api/auth/*`, `/api/catalog/*`, and `/api/playlists/*` to downstream services.
 3. **`Lyra.Identity.Api`** (ASP.NET Core Web API): User registration, login, JWT issuance (with `sub` / `userId` claims), encrypted per-user AI connections, and a private authenticated gRPC lookup service. Database: `identity_db` (PostgreSQL).
 4. **`Lyra.Catalog.Api`** (ASP.NET Core Web API):
    - Receives batch track metadata (`POST /api/catalog/tracks/batch`) with deterministic `TrackFingerprint` (SHA-256 of normalized `Title + Artist + DurationSeconds`) for deduplication.
    - Uses PostgreSQL `pg_trgm` GIN indexes for fast fuzzy search and **Redis** (`StackExchange.Redis`) for cache-aside user library reads.
    - Publishes `SongImportedEvent` via MassTransit and returns `202 Accepted`.
-   - Consumes `SongEnrichedEvent` to update track enrichment status and invalidate Redis cache.
+   - Consumes `SongLyricsFetchedEvent` to store lyrics before AI completion, and `SongEnrichedEvent` to update enrichment status and invalidate Redis cache.
    - Database: `catalog_db` (PostgreSQL).
 5. **`Lyra.Enrichment.Worker`** (Background Worker Service):
    - Stateless MassTransit consumer listening to `SongImportedEvent` (configured with low concurrency `PrefetchCount = 3` and exponential retry to respect external API rate limits).
-   - Step 1: Query `https://lrclib.net/api/get` for plain lyrics (fallback gracefully to metadata-only if 404).
-   - Step 2: Use `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10).
-   - Step 3: Publish `SongEnrichedEvent` containing lyrics, extracted tags, and a combined semantic summary string.
+   - Step 1: Query `https://lrclib.net/api/get` for plain and synced lyrics; on 404, use `/api/v2/search` with 0–100 scoring (title 55%, duration 30%, artist 15%), a hard `FuzzyMatchThreshold`, and detail fetches for the best eligible candidates. Normalize filename noise for the query only.
+   - Step 2: Publish `SongLyricsFetchedEvent` immediately when lyrics are found, before resolving the user's AI connection, so AI failures cannot lose them; include the selected LRCLIB record's canonical metadata.
+   - Step 3: Use `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10).
+   - Step 4: Publish `SongEnrichedEvent` containing both lyric forms, resolved metadata, extracted tags, and a combined semantic summary string.
 6. **`Lyra.PlaylistRag.Api`** (ASP.NET Core Web API):
    - Consumes `SongEnrichedEvent`, generates vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`), and upserts them into PostgreSQL with `pgvector` (`HNSW` cosine distance index).
    - Exposes `POST /api/playlists/generate`: rewrites user prompt into metadata filters + semantic search query, executes `pgvector` similarity search strictly scoped to `UserId`, and uses an LLM to select/sequence the top tracks into a cohesive playlist returning the user's `LocalTrackId`s.

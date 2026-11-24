@@ -17,7 +17,7 @@ interface IProps {
 }
 
 const TrackList: React.FC<IProps> = ({ tracks, onAttach, albumFor, emptyLabel = 'Nothing here yet.' }) => {
-  const { currentTrack, currentState, queue, toggleTrack } = useTrack();
+  const { currentTrack, currentState, toggleTrack } = useTrack();
 
   if (tracks.length === 0) {
     return <p className='empty'>{emptyLabel}</p>;
@@ -39,7 +39,7 @@ const TrackList: React.FC<IProps> = ({ tracks, onAttach, albumFor, emptyLabel = 
               type='button'
               className='row-play active-opacity'
               title={playing ? `Pause ${track.name}` : `Play ${track.name}`}
-              onClick={() => toggleTrack(track, queue && queue.length > 0 ? queue : tracks)}
+              onClick={() => toggleTrack(track, tracks)}
             >
               <span className='material-symbols-outlined'>{playing ? 'pause' : 'play_arrow'}</span>
             </button>
@@ -70,7 +70,14 @@ const TrackList: React.FC<IProps> = ({ tracks, onAttach, albumFor, emptyLabel = 
               >
                 {track.mediaurl ? 'on device' : 'metadata only'}
               </span>
-              <span className={track.isEnriched ? 'chip chip-ok' : 'chip'}>
+              <span
+                className={track.isEnriched ? 'chip chip-ok' : 'chip'}
+                title={
+                  track.isEnriched
+                    ? 'Lyrics and AI metadata have been stored for this track'
+                    : 'Queued for the enrichment worker once an AI provider is connected'
+                }
+              >
                 {track.isEnriched ? 'enriched' : 'awaiting enrichment'}
               </span>
             </div>

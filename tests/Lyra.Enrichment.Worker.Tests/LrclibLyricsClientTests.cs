@@ -5,6 +5,7 @@ using System.Text;
 using Lyra.Enrichment.Worker.Configuration;
 using Lyra.Enrichment.Worker.Services.Lyrics;
 using Lyra.Enrichment.Worker.Tests.TestDoubles;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -12,7 +13,7 @@ using Xunit;
 public class LrclibLyricsClientTests
 {
     [Fact]
-    public async Task GetPlainLyrics_EncodesQueryAndReturnsPlainLyrics()
+    public async Task GetLyrics_EncodesQueryAndReturnsPlainLyrics()
     {
         var handler = new RecordingHttpMessageHandler((_, _) =>
             Task.FromResult(JsonResponse("""
@@ -24,14 +25,15 @@ public class LrclibLyricsClientTests
                 """)));
         var client = CreateClient(handler);
 
-        var lyrics = await client.GetPlainLyricsAsync(
+        var lyrics = await client.GetLyricsAsync(
             "A & B / C",
             "Sigur Rós",
             "Album & More",
             245,
             CancellationToken.None);
 
-        Assert.Equal("line one\nline two", lyrics);
+        Assert.Equal("line one\nline two", lyrics.PlainLyrics);
+        Assert.Equal("[00:01.00] line one", lyrics.SyncedLyrics);
         var request = Assert.Single(handler.Requests);
         Assert.Equal(
             "http://localhost/api/get" +
@@ -46,13 +48,13 @@ public class LrclibLyricsClientTests
     }
 
     [Fact]
-    public async Task GetPlainLyrics_OmitsUnsupportedDurationAndBlankAlbum()
+    public async Task GetLyrics_OmitsUnsupportedDurationAndBlankAlbum()
     {
         var handler = new RecordingHttpMessageHandler((_, _) =>
             Task.FromResult(JsonResponse("""{"plainLyrics":"ok","instrumental":false}""")));
         var client = CreateClient(handler);
 
-        await client.GetPlainLyricsAsync(
+        await client.GetLyricsAsync(
             "Song",
             "Artist",
             "   ",
@@ -65,7 +67,7 @@ public class LrclibLyricsClientTests
     }
 
     [Fact]
-    public async Task GetPlainLyrics_NotFoundAndInstrumentalReturnNull()
+    public async Task GetLyrics_NotFoundAndInstrumentalReturnNull()
     {
         var notFoundClient = CreateClient(new RecordingHttpMessageHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))));
@@ -74,10 +76,10 @@ public class LrclibLyricsClientTests
                 {"plainLyrics":null,"instrumental":true}
                 """))));
 
-        Assert.Null(await notFoundClient.GetPlainLyricsAsync(
-            "Song", "Artist", null, 100, CancellationToken.None));
-        Assert.Null(await instrumentalClient.GetPlainLyricsAsync(
-            "Song", "Artist", null, 100, CancellationToken.None));
+        Assert.False((await notFoundClient.GetLyricsAsync(
+            "Song", "Artist", null, 100, CancellationToken.None)).HasLyrics);
+        Assert.False((await instrumentalClient.GetLyricsAsync(
+            "Song", "Artist", null, 100, CancellationToken.None)).HasLyrics);
     }
 
     [Theory]
@@ -86,7 +88,7 @@ public class LrclibLyricsClientTests
     [InlineData(HttpStatusCode.BadGateway, true)]
     [InlineData(HttpStatusCode.Unauthorized, false)]
     [InlineData(HttpStatusCode.BadRequest, false)]
-    public async Task GetPlainLyrics_MapsHttpStatusForRetryDecisions(
+    public async Task GetLyrics_MapsHttpStatusForRetryDecisions(
         HttpStatusCode status,
         bool expectedTransient)
     {
@@ -94,7 +96,7 @@ public class LrclibLyricsClientTests
             Task.FromResult(new HttpResponseMessage(status))));
 
         var exception = await Assert.ThrowsAsync<LrclibRequestException>(
-            () => client.GetPlainLyricsAsync(
+            () => client.GetLyricsAsync(
                 "Song", "Artist", null, 100, CancellationToken.None));
 
         Assert.Equal((int)status, exception.StatusCode);
@@ -102,20 +104,20 @@ public class LrclibLyricsClientTests
     }
 
     [Fact]
-    public async Task GetPlainLyrics_MalformedJsonIsPermanent()
+    public async Task GetLyrics_MalformedJsonIsPermanent()
     {
         var client = CreateClient(new RecordingHttpMessageHandler((_, _) =>
             Task.FromResult(JsonResponse("{not-json"))));
 
         var exception = await Assert.ThrowsAsync<LrclibRequestException>(
-            () => client.GetPlainLyricsAsync(
+            () => client.GetLyricsAsync(
                 "Song", "Artist", null, 100, CancellationToken.None));
 
         Assert.False(exception.IsTransient);
     }
 
     [Fact]
-    public async Task GetPlainLyrics_NetworkFailureIsTransient()
+    public async Task GetLyrics_NetworkFailureIsTransient()
     {
         var client = CreateClient(new RecordingHttpMessageHandler((_, _) =>
             throw new HttpRequestException(
@@ -124,7 +126,7 @@ public class LrclibLyricsClientTests
                 HttpStatusCode.ServiceUnavailable)));
 
         var exception = await Assert.ThrowsAsync<LrclibRequestException>(
-            () => client.GetPlainLyricsAsync(
+            () => client.GetLyricsAsync(
                 "Song", "Artist", null, 100, CancellationToken.None));
 
         Assert.True(exception.IsTransient);
@@ -132,7 +134,7 @@ public class LrclibLyricsClientTests
     }
 
     [Fact]
-    public async Task GetPlainLyrics_CallerCancellationPropagates()
+    public async Task GetLyrics_CallerCancellationPropagates()
     {
         var client = CreateClient(new RecordingHttpMessageHandler(async (_, ct) =>
         {
@@ -143,7 +145,7 @@ public class LrclibLyricsClientTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => client.GetPlainLyricsAsync(
+            () => client.GetLyricsAsync(
                 "Song", "Artist", null, 100, cancellation.Token));
     }
 
@@ -151,12 +153,14 @@ public class LrclibLyricsClientTests
     public void BuildRequestPath_RequiresTitleAndArtist()
     {
         Assert.Throws<ArgumentException>(
-            () => LrclibLyricsClient.BuildRequestPath("", "Artist", null, 100));
+            () => LrclibLyricsClient.BuildRequestPath("", "Artist", 100));
         Assert.Throws<ArgumentException>(
-            () => LrclibLyricsClient.BuildRequestPath("Song", " ", null, 100));
+            () => LrclibLyricsClient.BuildRequestPath("Song", " ", 100));
     }
 
-    private static LrclibLyricsClient CreateClient(HttpMessageHandler handler)
+    private static LrclibLyricsClient CreateClient(
+        HttpMessageHandler handler,
+        IMemoryCache? cache = null)
     {
         var options = new LrclibOptions
         {
@@ -170,8 +174,13 @@ public class LrclibLyricsClientTests
         {
             BaseAddress = new Uri("http://localhost/")
         };
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", options.UserAgent);
 
-        return new LrclibLyricsClient(httpClient, throttle, Options.Create(options));
+        return new LrclibLyricsClient(
+            httpClient,
+            throttle,
+            Options.Create(options),
+            cache);
     }
 
     private static HttpResponseMessage JsonResponse(string json) =>

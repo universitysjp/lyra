@@ -59,10 +59,13 @@ const Buttons: React.FC<IProps> = ({ album }) => {
         type='button'
         className='flex flex-h-center flex-v-center small active-opacity'
         title='Shuffle this album'
+        aria-label='Shuffle this album'
         disabled={album.tracks.length === 0}
         onClick={onShuffle}
       >
-        <span className='material-symbols-outlined'>shuffle</span>
+        <span className='material-symbols-outlined' aria-hidden='true'>
+          shuffle
+        </span>
       </button>
       <button
         type='button'
@@ -70,8 +73,9 @@ const Buttons: React.FC<IProps> = ({ album }) => {
         disabled={album.tracks.length === 0}
         className='play-button flex flex-h-center flex-v-center active-opacity'
         title='Play or pause this album'
+        aria-label='Play or pause this album'
       >
-        <span className='material-symbols-outlined'>
+        <span className='material-symbols-outlined' aria-hidden='true'>
           {currentState === 'playing' ? 'pause' : 'play_arrow'}
         </span>
       </button>
@@ -79,9 +83,12 @@ const Buttons: React.FC<IProps> = ({ album }) => {
         type='button'
         className='flex flex-h-center flex-v-center small active-opacity'
         title='Reload this page of the library'
+        aria-label='Reload this page of the library'
         onClick={reload}
       >
-        <span className='material-symbols-outlined'>refresh</span>
+        <span className='material-symbols-outlined' aria-hidden='true'>
+          refresh
+        </span>
       </button>
     </section>
   );

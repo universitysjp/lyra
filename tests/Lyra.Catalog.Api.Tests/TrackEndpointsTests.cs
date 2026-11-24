@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Lyra.Catalog.Api.DTOs.Requests;
 using Lyra.Catalog.Api.DTOs.Responses;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 public class TrackEndpointsTests : IClassFixture<PostgresTestFixture>
@@ -266,6 +267,56 @@ public class TrackEndpointsTests : IClassFixture<PostgresTestFixture>
         Assert.Equal(1, page.Page);
         Assert.Equal(200, page.PageSize);
         Assert.Equal(3, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task Lyrics_AreScopedToTheOwner_AndExposeSyncedVersion()
+    {
+        using var factory = await CreateFactoryAsync();
+        var userIdA = Guid.NewGuid();
+        var userIdB = Guid.NewGuid();
+        using var clientA = CreateClient(factory, userIdA);
+        using var clientB = CreateClient(factory, userIdB);
+
+        await clientA.PostAsJsonAsync(
+            "/api/catalog/tracks/batch",
+            CreateRequest(("local-a", "Bohemian Rhapsody", "Queen", 355)));
+
+        var options = new DbContextOptionsBuilder<Lyra.Catalog.Api.Data.CatalogDbContext>()
+            .UseNpgsql(_fixture.ConnectionString)
+            .Options;
+        Guid trackId;
+
+        await using (var db = new Lyra.Catalog.Api.Data.CatalogDbContext(options))
+        {
+            var track = await db.Tracks.SingleAsync(item => item.Title == "Bohemian Rhapsody");
+            trackId = track.Id;
+            var repository = new Lyra.Catalog.Api.Repositories.TrackRepository(db);
+            await repository.ApplyLyricsAsync(
+                trackId,
+                "plain lyrics",
+                "[00:01.00] synced lyrics",
+                null,
+                CancellationToken.None);
+        }
+
+        var lyrics = await clientA.GetFromJsonAsync<TrackLyricsResponse>(
+            $"/api/catalog/tracks/{trackId}/lyrics");
+
+        Assert.NotNull(lyrics);
+        Assert.Equal(trackId, lyrics.TrackId);
+        Assert.False(lyrics.IsEnriched);
+        Assert.Equal("plain lyrics", lyrics.PlainLyrics);
+        Assert.Equal("[00:01.00] synced lyrics", lyrics.SyncedLyrics);
+
+        var page = await clientA.GetFromJsonAsync<PagedResponse<TrackResponse>>(
+            "/api/catalog/tracks");
+        var listed = Assert.Single(page!.Items);
+        Assert.True(listed.HasLyrics);
+        Assert.True(listed.HasSyncedLyrics);
+
+        var forbidden = await clientB.GetAsync($"/api/catalog/tracks/{trackId}/lyrics");
+        Assert.Equal(HttpStatusCode.NotFound, forbidden.StatusCode);
     }
 
     [Fact]

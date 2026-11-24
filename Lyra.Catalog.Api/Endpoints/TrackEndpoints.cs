@@ -66,6 +66,22 @@ public static class TrackEndpoints
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/{trackId:guid}/lyrics", async Task<Ok<TrackLyricsResponse>> (
+            Guid trackId,
+            ClaimsPrincipal principal,
+            ITrackQueryService queryService,
+            CancellationToken ct) =>
+        {
+            var userId = principal.GetUserId();
+            var lyrics = await queryService.GetLyricsAsync(userId, trackId, ct);
+            return TypedResults.Ok(lyrics);
+        })
+        .WithName("GetTrackLyrics")
+        .WithSummary("Get lyrics for one owned track")
+        .Produces<TrackLyricsResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 }

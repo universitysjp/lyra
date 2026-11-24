@@ -18,6 +18,8 @@ const track = (overrides: Partial<ITrack> = {}): ITrack => ({
   duration: '05:55',
   durationSeconds: 355,
   isEnriched: false,
+  hasLyrics: false,
+  hasSyncedLyrics: false,
   importedAt: '2026-11-17T10:00:00Z',
   mediaurl: '',
   artwork: 'data:image/svg+xml,test',

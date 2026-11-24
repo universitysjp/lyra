@@ -2,7 +2,7 @@ namespace Lyra.Enrichment.Worker.Services.Lyrics;
 
 public interface ILyricsClient
 {
-    Task<string?> GetPlainLyricsAsync(
+    Task<LyricsResult> GetLyricsAsync(
         string title,
         string artist,
         string? album,

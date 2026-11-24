@@ -14,8 +14,9 @@ const AppLayout: React.FC = () => (
 
     <footer className='footnote flex flex-gap-small flex-v-center flex-h-center'>
       <span className='muted small'>
-        Prototype for the Lyra backend: Identity login and refresh, catalog batch import, paged
-        library reads and pg_trgm fuzzy search. Audio stays on this device.
+        Prototype for the Lyra backend: Identity login and refresh, encrypted AI provider settings,
+        catalog batch import, paged library reads and pg_trgm fuzzy search. Audio stays on this
+        device.
       </span>
     </footer>
 

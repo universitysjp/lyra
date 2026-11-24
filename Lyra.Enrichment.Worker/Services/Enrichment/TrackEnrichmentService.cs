@@ -13,7 +13,8 @@ public sealed class TrackEnrichmentService(
     ILyricsClient lyricsClient,
     ITrackAnalysisService analysisService,
     TimeProvider? timeProvider = null,
-    ILogger<TrackEnrichmentService>? logger = null) : ITrackEnrichmentService
+    ILogger<TrackEnrichmentService>? logger = null,
+    ILyricsFetchedPublisher? lyricsPublisher = null) : ITrackEnrichmentService
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly ILogger? _logger = logger;
@@ -32,11 +33,7 @@ public sealed class TrackEnrichmentService(
         var cached = await resultStore.GetAsync(request.TrackId, ct);
         if (cached is not null)
         {
-            _logger?.LogDebug(
-                "Using cached enrichment for track {TrackId} while processing user {UserId}.",
-                request.TrackId,
-                request.UserId);
-            return CreateEvent(request, cached);
+            return await UseCachedAsync(request, cached, ct);
         }
 
         var enrichmentLock = await resultStore.TryAcquireLockAsync(request.TrackId, ct)
@@ -47,16 +44,22 @@ public sealed class TrackEnrichmentService(
             cached = await resultStore.GetAsync(request.TrackId, ct);
             if (cached is not null)
             {
-                return CreateEvent(request, cached);
+                return await UseCachedAsync(request, cached, ct);
             }
 
-            var connection = await connectionClient.GetRequiredAsync(request.UserId, ct);
-            var lyrics = await lyricsClient.GetPlainLyricsAsync(
+            var lyrics = await lyricsClient.GetLyricsAsync(
                 request.Title,
                 request.Artist,
                 request.Album,
                 request.DurationSeconds,
                 ct);
+
+            // Persist lyrics before touching the user's AI connection. Publishing through
+            // the bus (not the consumer outbox) means a later gRPC or provider failure
+            // cannot roll this back.
+            await PublishLyricsAsync(request, lyrics, ct);
+
+            var connection = await connectionClient.GetRequiredAsync(request.UserId, ct);
 
             var analysis = await analysisService.AnalyzeAsync(
                 new TrackAnalysisRequest(
@@ -64,7 +67,7 @@ public sealed class TrackEnrichmentService(
                     request.Artist,
                     request.Album,
                     request.DurationSeconds,
-                    lyrics),
+                    lyrics.PlainLyrics),
                 connection,
                 sessionId,
                 ct);
@@ -78,11 +81,13 @@ public sealed class TrackEnrichmentService(
                 analysis.EnergyLevel);
 
             var result = new TrackEnrichmentResult(
-                lyrics,
+                lyrics.PlainLyrics,
+                lyrics.SyncedLyrics,
                 analysis.PrimaryMood,
                 analysis.Themes,
                 analysis.EnergyLevel,
-                summary);
+                summary,
+                lyrics.Metadata);
 
             await resultStore.SetAsync(request.TrackId, result, ct);
             _logger?.LogInformation(
@@ -94,6 +99,76 @@ public sealed class TrackEnrichmentService(
         }
     }
 
+    private async Task<SongEnrichedEvent> UseCachedAsync(
+        SongImportedEvent request,
+        TrackEnrichmentResult cached,
+        CancellationToken ct)
+    {
+        var hasLyrics = cached.Lyrics is not null || cached.SyncedLyrics is not null;
+
+        if (hasLyrics && cached.ResolvedMetadata is not null)
+        {
+            _logger?.LogDebug(
+                "Using cached enrichment for track {TrackId} while processing user {UserId}.",
+                request.TrackId,
+                request.UserId);
+            return CreateEvent(request, cached);
+        }
+
+        // Older cache entries were created before lyrics or canonical metadata existed.
+        // Re-check LRCLIB without repeating the paid AI call, then upgrade the cache.
+        var freshLyrics = await lyricsClient.GetLyricsAsync(
+            request.Title,
+            request.Artist,
+            request.Album,
+            request.DurationSeconds,
+            ct);
+
+        if (!freshLyrics.HasLyrics)
+        {
+            _logger?.LogDebug(
+                "Cached enrichment for track {TrackId} still has no lyrics to merge.",
+                request.TrackId);
+            return CreateEvent(request, cached);
+        }
+
+        var merged = cached with
+        {
+            Lyrics = freshLyrics.PlainLyrics ?? cached.Lyrics,
+            SyncedLyrics = freshLyrics.SyncedLyrics ?? cached.SyncedLyrics,
+            ResolvedMetadata = freshLyrics.Metadata ?? cached.ResolvedMetadata
+        };
+
+        await PublishLyricsAsync(
+            request,
+            new LyricsResult(merged.Lyrics, merged.SyncedLyrics, merged.ResolvedMetadata),
+            ct);
+        await resultStore.SetAsync(request.TrackId, merged, ct);
+
+        return CreateEvent(request, merged);
+    }
+
+    private Task PublishLyricsAsync(
+        SongImportedEvent request,
+        LyricsResult lyrics,
+        CancellationToken ct)
+    {
+        if (!lyrics.HasLyrics || lyricsPublisher is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return lyricsPublisher.PublishAsync(
+            new SongLyricsFetchedEvent(
+                request.TrackId,
+                request.UserId,
+                lyrics.PlainLyrics,
+                lyrics.SyncedLyrics,
+                _timeProvider.GetUtcNow(),
+                lyrics.Metadata),
+            ct);
+    }
+
     private SongEnrichedEvent CreateEvent(
         SongImportedEvent request,
         TrackEnrichmentResult result) =>
@@ -101,9 +176,11 @@ public sealed class TrackEnrichmentService(
             request.TrackId,
             request.UserId,
             result.Lyrics,
+            result.SyncedLyrics,
             result.PrimaryMood,
             result.Themes,
             result.EnergyLevel,
             result.SemanticSummary,
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            result.ResolvedMetadata);
 }

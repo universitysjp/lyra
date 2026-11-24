@@ -16,6 +16,7 @@ const TABS: [string, string][] = [
   ['/albums', 'Albums'],
   ['/search', 'Search'],
   ['/import', 'Sync metadata'],
+  ['/settings', 'AI provider'],
 ];
 
 /** App chrome: brand, section tabs, the fuzzy search box and the signed-in account state. */
