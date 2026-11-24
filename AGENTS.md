@@ -73,6 +73,7 @@ Do not introduce alternative databases, brokers, caches, or AI abstraction libra
 - Tests live under `tests/<ProjectName>.Tests/`, mirroring the corresponding project name.
 - Each service owns a single `appsettings.json` / `appsettings.Development.json`; never hardcode connection strings, broker credentials, or AI provider API keys — keep all secrets in the gitignored repository-root `.env` file (template: `.env.example`). Docker Compose reads it directly; .NET services load it via `DotNetEnv` so `Section__Key` variables map onto the standard configuration system. Environment variables and user secrets remain valid overrides.
 - Docker Compose definitions for local infrastructure (PostgreSQL instances, RabbitMQ, Redis) belong in `docker-compose.yml` at the repository root.
+- Build settings are centralized in `Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings-as-errors) and `.editorconfig`. Do not re-specify those defaults per project; the build stays at zero warnings. `global.json` pins the SDK.
 - Vendored agent-skill packs (`skills/`), IDE state (`.idea/`), and agent tool plans/state (`.junie/`) are local-only developer tooling; they are gitignored and must not be committed.
 
 ## 6. Testing Expectations

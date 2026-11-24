@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `2026-11-24` — Pinned the SDK in `global.json` (`10.0.404`), centralized build settings in `Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings-as-errors, deterministic CI builds) and `.editorconfig`, and dropped an unused test fixture field that the new analyzer settings flagged. Why: every project had its own copy of the same defaults, and nothing stopped warnings from accumulating. Docs: `README.md`, `AGENTS.md`, `CHANGELOG.md`. Confirmed: owner.
 - `2026-11-24` — Moved the two Junie implementation plans from `.junie/plans/` to `docs/plans/` with an index, and stopped tracking the `.junie/` tool directory (now gitignored). Why: the plans document real implementation work and belong next to the architecture docs, while the tool directory is local state. Docs: `docs/plans/README.md`, `AGENTS.md`, `.gitignore`, `CHANGELOG.md`. Confirmed: owner.
 - `2026-11-24` — Stopped tracking vendored agent-skill packs and IDE state: `skills/` (3835 files, ~31 MB of vendored .NET agent skills) and `.idea/` are no longer in the index and are gitignored, so they stay local. Why: they made clones, code search, and review noisy. Docs: `AGENTS.md`, `.gitignore`, `CHANGELOG.md`. Confirmed: owner.
 - `Lyra.Catalog.Api` library responses expose `isEnriched`, `hasLyrics`, and `hasSyncedLyrics` from the shared track row; enrichment and lyric updates are visible to every user who owns the track.

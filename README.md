@@ -102,7 +102,7 @@ CHANGELOG.md
 
 ### Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) — the exact SDK is pinned in [`global.json`](global.json) (`10.0.404`)
 - [Docker](https://www.docker.com/) & Docker Compose (for PostgreSQL, RabbitMQ, Redis)
 - An API key for your chosen `Microsoft.Extensions.AI` provider (e.g. Gemini or OpenAI)
 

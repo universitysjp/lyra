@@ -9,11 +9,9 @@ using Xunit;
 
 public class AuthServiceTests : IClassFixture<PostgresTestFixture>
 {
-    private readonly PostgresTestFixture _fixture;
-
     public AuthServiceTests(PostgresTestFixture fixture)
     {
-        _fixture = fixture;
+        // The fixture owns the PostgreSQL container; the class needs it alive, not its value.
     }
 
     [Fact]

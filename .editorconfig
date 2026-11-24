@@ -1,0 +1,54 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,jsonc,yml,yaml,props,targets,csproj,slnx}]
+indent_size = 2
+
+[*.{ts,tsx,js,jsx,mjs,cjs,css,html}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.sh]
+indent_size = 2
+
+# ── C# ────────────────────────────────────────────────────────────────────────
+[*.cs]
+indent_size = 4
+
+# Explicit `using` blocks first, then System.* sorted normally.
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# File-scoped namespaces keep diffs small; the codebase already uses them.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+
+# Unused and redundant code is noise in review.
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
+dotnet_diagnostic.IDE0060.severity = suggestion
+dotnet_diagnostic.CA1848.severity = suggestion
+
+# EF Core scaffolds migrations with block namespaces and generated summaries.
+# Treat them as generated code and leave them exactly as the tool wrote them.
+[**/Migrations/*.cs]
+generated_code = true
+csharp_style_namespace_declarations = none
+dotnet_diagnostic.IDE0161.severity = none
+
+# Tests read better with magic numbers and inline strings.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
