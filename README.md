@@ -1,6 +1,6 @@
 # Lyra
 
-**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging, vector embeddings) and exposes a Retrieval-Augmented Generation (RAG) endpoint for generating custom playlists from the user's own catalog.
+**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging). A Retrieval-Augmented Generation (RAG) endpoint for generating custom playlists from the user's own catalog is **planned**; it does not exist yet (ADR-0003).
 
 ## Table of Contents
 
@@ -22,8 +22,8 @@
    - Fetch plain and synced lyrics from [LRCLIB](https://lrclib.net/). Metadata is normalized for the query only (file extensions and filename noise such as `(mp3.pm)` are stripped), then an exact lookup is attempted. If LRCLIB returns `404`, the v2 search endpoint supplies candidate metadata which is scored title-first (55% title, 30% duration, 15% artist) before the best qualifying candidate is fetched.
    - Store whatever lyrics were found **before** resolving the AI provider, so a missing/broken AI connection never loses successful lyrics.
    - Categorize mood, themes, and energy level via an LLM using `Microsoft.Extensions.AI` and the caller's encrypted, per-user AI provider connection.
-4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries) and `Lyra.PlaylistRag.Api` (generates vector embeddings into PostgreSQL `pgvector`).
-5. Users can prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog.
+4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries). Consumption by `Lyra.PlaylistRag.Api` (generating vector embeddings into PostgreSQL `pgvector`) is **planned, not active** — that project is currently a stub (ADR-0003).
+5. **Planned:** users will prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog. The endpoint does not exist yet; `Lyra.PlaylistRag.Api` today only wires authentication and serves `/ping`.
 
 ## Architecture
 
@@ -35,8 +35,8 @@ Lyra follows a **database-per-service** microservices architecture with asynchro
                          └─────────┬─────────┘
                  ┌─────────────────┼─────────────────────┐
                  ▼                 ▼                      ▼
-       Lyra.Identity.Api   Lyra.Catalog.Api      Lyra.PlaylistRag.Api
-        (identity_db)        (catalog_db)             (vector_db)
+       Lyra.Identity.Api   Lyra.Catalog.Api      Lyra.PlaylistRag.Api (planned)
+        (identity_db)        (catalog_db)         (vector_db, planned)
                                    │   ▲                    ▲
                         SongImportedEvent │          SongEnrichedEvent
                                    ▼   │                    │
@@ -47,7 +47,7 @@ Lyra follows a **database-per-service** microservices architecture with asynchro
                Redis                    ◀──── catalog cache-aside
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of each service, its responsibilities, and data contracts.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of each service, its responsibilities, and data contracts. `Lyra.PlaylistRag.Api` and its `vector_db` appear in the diagram for context only: both are planned (ADR-0003).
 
 ## Services
 
@@ -58,7 +58,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of e
 | `Lyra.Identity.Api` | ASP.NET Core Web API | Registration, login, JWT issuance, encrypted per-user AI provider connections, private gRPC lookup | `identity_db` |
 | `Lyra.Catalog.Api` | ASP.NET Core Web API | Batch track ingestion, dedup, fuzzy search, Redis cache-aside, enrichment state | `catalog_db` |
 | `Lyra.Enrichment.Worker` | Background Worker Service | Lyrics fetch (LRCLIB exact + fuzzy fallback) + LLM mood/theme/energy extraction | — |
-| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Embedding generation, `pgvector` similarity search, RAG playlist generation | `vector_db` |
+| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Stub only — JWT wiring and `/ping`. Embedding generation, `pgvector` search, and playlist generation are planned (ADR-0003). | `vector_db` (planned) |
 
 ## Technology Stack
 
@@ -79,7 +79,7 @@ Lyra.Identity.Api/
 Lyra.Catalog.Api/
 Lyra.AI/                 # Shared Microsoft.Extensions.AI provider adapter
 Lyra.Enrichment.Worker/
-Lyra.PlaylistRag.Api/
+Lyra.PlaylistRag.Api/     # (planned) stub: JWT wiring + /ping only, see ADR-0003
 clients/lyra-player/      # React/Vite reference client used to exercise the backend
 tests/
   Lyra.Identity.Api.Tests/
@@ -96,7 +96,7 @@ CONTRIBUTING.md
 CHANGELOG.md
 ```
 
-> **Note:** Lyra is in early scaffolding. Projects are added incrementally to `Lyra.slnx`; see [`CHANGELOG.md`](CHANGELOG.md) for current progress.
+> **Note:** Lyra is in early scaffolding. Projects are added incrementally to `Lyra.slnx`; see [`CHANGELOG.md`](CHANGELOG.md) for current progress. `Lyra.PlaylistRag.Api` is present but is only a stub (JWT wiring and `/ping`); RAG playlist generation is planned, per [ADR-0003](docs/decisions/ADR-0003-playlist-rag-remains-planned.md).
 
 ## Getting Started
 

@@ -30,7 +30,7 @@ No service-specific logic lives here — only contracts.
 - Routes:
   - `/api/auth/*` → `Lyra.Identity.Api`
   - `/api/catalog/*` → `Lyra.Catalog.Api`
-  - `/api/playlists/*` → `Lyra.PlaylistRag.Api`
+  - `/api/playlists/*` → `Lyra.PlaylistRag.Api` (route provisioned; the target is a stub and the endpoint is planned, see §2.6)
 
 ### 2.3 `Lyra.Identity.Api` (ASP.NET Core Web API)
 
@@ -43,7 +43,7 @@ No service-specific logic lives here — only contracts.
 ### 2.4 `Lyra.Catalog.Api` (ASP.NET Core Web API)
 
 - Owns the catalog pipeline entry point and `catalog_db`.
-- **Centralized track store:** a global `tracks` table holds one row per unique track (`TrackFingerprint` unique), and a `user_tracks` link table maps each user to the tracks they own with `LocalTrackId` and `ImportedAt`. Enrichment columns live on the shared `tracks` row, so a track is enriched once for all users. Resolved LRCLIB metadata is stored in separate `Resolved*` columns because the original local ID3 values may be unreliable; RAG playlist generation can prefer the canonical values.
+- **Centralized track store:** a global `tracks` table holds one row per unique track (`TrackFingerprint` unique), and a `user_tracks` link table maps each user to the tracks they own with `LocalTrackId` and `ImportedAt`. Enrichment columns live on the shared `tracks` row, so a track is enriched once for all users. Resolved LRCLIB metadata is stored in separate `Resolved*` columns because the original local ID3 values may be unreliable; playlist generation, once implemented (planned — see §2.6), can prefer the canonical values.
 - `POST /api/catalog/tracks/batch`:
   - Accepts up to 500 metadata items, validates the whole batch, and collapses in-batch duplicates.
   - Computes a deterministic `TrackFingerprint` (SHA-256 of normalized `Title + Artist + DurationSeconds`) server-side.
@@ -94,16 +94,20 @@ No service-specific logic lives here — only contracts.
 
 ### 2.6 `Lyra.PlaylistRag.Api` (ASP.NET Core Web API)
 
-- Consumes `SongEnrichedEvent`:
+**Planned — not implemented.** See [ADR-0003](decisions/ADR-0003-playlist-rag-remains-planned.md). Today the project is a stub: `Program.cs` wires JWT bearer authentication via `AddLyraJwtAuthentication()` and maps one authenticated `/ping` endpoint. `Lyra.Gateway` already routes `/api/playlists/*` to it, and `vector_db` is provisioned, but there is no `DbContext`, no MassTransit consumer, no embedding call, and no `/api/playlists/generate` endpoint — that path returns `404`.
+
+Planned behaviour (design intent, not current behaviour):
+
+- Will consume `SongEnrichedEvent`:
   - Uses the event's `ResolvedMetadata` (LRCLIB title/artist/album/duration/instrumental) as the canonical track shape for embedding summaries and later playlist filters, while keeping the user's `LocalTrackId` for playback.
   - Generates vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`) from the semantic summary.
   - Upserts embeddings into PostgreSQL using `pgvector`, with an `HNSW` cosine-distance index.
-- `POST /api/playlists/generate`:
+- Will expose `POST /api/playlists/generate`:
   1. Rewrites the user's natural-language prompt into metadata filters plus a semantic search query.
   2. Executes a `pgvector` similarity search strictly scoped to the authenticated `UserId`.
   3. Uses an LLM to select and sequence the top matching tracks into a cohesive playlist.
   4. Returns the user's `LocalTrackId`s (never server-side track IDs, since the client owns the audio files locally).
-- Database: `vector_db` (PostgreSQL + `pgvector`).
+- Will own `vector_db` (PostgreSQL + `pgvector`).
 
 ## 3. Event Flow
 
@@ -119,12 +123,12 @@ Lyra.Catalog.Api ──SongImportedEvent──▶ RabbitMQ ──▶ Lyra.Enrich
    │                                                        │
    │                                                        │ SongEnrichedEvent
    │                                                        ▼
-   └───────────── SongEnrichedEvent ◀── RabbitMQ ◀── Lyra.PlaylistRag.Api
+   └───────────── SongEnrichedEvent ◀── RabbitMQ ◀── Lyra.PlaylistRag.Api (planned)
                                                             │
-                                               embeddings upserted into vector_db
+                                               embeddings upserted into vector_db (planned)
 ```
 
-- `Lyra.Catalog.Api` consumes `SongLyricsFetchedEvent` (lyrics only, not enriched) and `SongEnrichedEvent` (full enrichment). `Lyra.PlaylistRag.Api` consumes `SongEnrichedEvent` independently.
+- `Lyra.Catalog.Api` consumes `SongLyricsFetchedEvent` (lyrics only, not enriched) and `SongEnrichedEvent` (full enrichment). Once implemented, `Lyra.PlaylistRag.Api` will consume `SongEnrichedEvent` independently (planned — no consumer exists today; see §2.6 and [ADR-0003](decisions/ADR-0003-playlist-rag-remains-planned.md)).
 
 **Catalog ingestion and the outbox**
 
@@ -142,13 +146,13 @@ A successful batch import bumps the caller's `catalog:tracks:{userId}:ver` count
 |---|---|---|
 | `identity_db` | `Lyra.Identity.Api` | — |
 | `catalog_db` | `Lyra.Catalog.Api` | `pg_trgm` (GIN index for fuzzy search) |
-| `vector_db` | `Lyra.PlaylistRag.Api` | `vector` (pgvector, HNSW cosine distance index) |
+| `vector_db` | `Lyra.PlaylistRag.Api` (planned) | `vector` (pgvector, HNSW cosine distance index) — planned |
 
 All PostgreSQL databases run on PostgreSQL 17 using the `pgvector/pgvector:pg17` image so that `vector_db` has `pgvector` available out of the box; other databases simply don't enable the extension.
 
 ## 5. Infrastructure
 
-- **RabbitMQ 4** via `MassTransit.RabbitMQ` v8.5.x (Apache 2.0) — the event backbone connecting `Lyra.Catalog.Api`, `Lyra.Enrichment.Worker`, and `Lyra.PlaylistRag.Api`.
+- **RabbitMQ 4** via `MassTransit.RabbitMQ` v8.5.x (Apache 2.0) — the event backbone connecting `Lyra.Catalog.Api`, `Lyra.Enrichment.Worker`, and `Lyra.PlaylistRag.Api` (planned — the stub does not connect to the broker yet).
 - **Redis 7** via `Microsoft.Extensions.Caching.StackExchangeRedis` — cache-aside layer in `Lyra.Catalog.Api`.
 - **`Microsoft.Extensions.AI`** — abstraction over chat/completion and embedding generation, configured for cloud providers (e.g. Gemini, OpenAI) rather than local inference, due to the 12 GB host RAM constraint.
 - **YARP (`Yarp.ReverseProxy`)** — public reverse proxy and routing layer in `Lyra.Gateway`.
@@ -168,4 +172,4 @@ All PostgreSQL databases run on PostgreSQL 17 using the `pgvector/pgvector:pg17`
 - **Defense in Depth & Header Stripping:** `Lyra.Gateway` removes client-supplied identity headers (`X-User-Id`, `X-UserId`, `userId`) and rate limits endpoints (strict fixed window for auth, token bucket for APIs). Downstream microservices resolve the authenticated user ID exclusively via `User.GetUserId()`.
 - **Private gRPC:** internal gRPC uses a separate HTTP/2 listener and the `x-lyra-internal-key` metadata credential. Development may use loopback h2c; non-Development startup rejects a non-HTTPS gRPC endpoint. No Gateway route matches the gRPC service path.
 - **Per-user AI credentials (BYOK):** AI provider keys are accepted only through the authenticated `/api/auth/ai-connection` endpoints, encrypted with ASP.NET Core Data Protection using the `Lyra.Identity.UserAiConnection.v1` purpose, and stored in `identity_db`. API responses expose provider/model/plan metadata but never the key. The Worker receives the decrypted key only over the private authenticated gRPC call and keeps no persistent copy.
-- Playlists are generated and returned only in terms of `LocalTrackId`s — the backend never needs to resolve or return actual audio file locations.
+- When playlist generation is implemented (planned, [ADR-0003](decisions/ADR-0003-playlist-rag-remains-planned.md)), playlists will be generated and returned only in terms of `LocalTrackId`s — the backend never needs to resolve or return actual audio file locations.
