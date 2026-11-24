@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `2026-11-24` — Adopted a docs-first workflow and architecture decision records: `docs/decisions/` (index, template, ADR-0001–0003) and `AGENTS.md` §0/§8–§11. Why: `README.md` and `docs/ARCHITECTURE.md` had drifted from the code (`Lyra.PlaylistRag.Api` was described as built), and there was no recorded reason for standing boundaries. Docs: `AGENTS.md`, `docs/decisions/README.md`, `docs/decisions/ADR-*.md`, `CHANGELOG.md`. Confirmed: owner.
 - Initial repository scaffolding: `Lyra.slnx` solution file.
 - Project documentation: `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, `LICENSE`.
 - `Lyra.Contracts`: shared JWT authentication configuration (`AddLyraJwtAuthentication`), `JwtOptions`, and `ClaimsPrincipal` extensions.
