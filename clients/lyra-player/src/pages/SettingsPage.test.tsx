@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -82,9 +82,7 @@ describe('SettingsPage', () => {
     await screen.findByText(/Provider saved/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    expect(
-      screen.getByText(/Disconnect this provider\? Your tracks stay/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Disconnect this provider\? Your tracks stay/)).toBeInTheDocument();
 
     const confirmation = screen.getByText(/Disconnect this provider\?/).closest('.confirm-row');
     expect(confirmation).not.toBeNull();

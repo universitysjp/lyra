@@ -122,7 +122,10 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
     (options.tracks ?? []).forEach((item) => upsert(item, users[0].userId));
   }
 
-  function setLyrics(trackId: string, lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>): void {
+  function setLyrics(
+    trackId: string,
+    lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>,
+  ): void {
     const track = tracks.find((item) => item.id === trackId);
 
     if (!track) {
@@ -357,19 +360,35 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       }
 
       if (!model || model.length > 200) {
-        return problem(400, 'Validation Failed', 'The AI model must be nonblank and no longer than 200 characters.');
+        return problem(
+          400,
+          'Validation Failed',
+          'The AI model must be nonblank and no longer than 200 characters.',
+        );
       }
 
       if (!apiKey.trim() || apiKey.length > 512) {
-        return problem(400, 'Validation Failed', 'The API key must be nonblank and no longer than 512 characters.');
+        return problem(
+          400,
+          'Validation Failed',
+          'The API key must be nonblank and no longer than 512 characters.',
+        );
       }
 
       if (input.provider === 'OpenCode') {
         if (!plan || !OPEN_CODE_PLANS.includes(plan)) {
-          return problem(400, 'Validation Failed', 'An OpenCode plan is required for the OpenCode provider.');
+          return problem(
+            400,
+            'Validation Failed',
+            'An OpenCode plan is required for the OpenCode provider.',
+          );
         }
       } else if (plan !== null) {
-        return problem(400, 'Validation Failed', 'An OpenCode plan is only valid for the OpenCode provider.');
+        return problem(
+          400,
+          'Validation Failed',
+          'An OpenCode plan is only valid for the OpenCode provider.',
+        );
       }
 
       const previous = aiConnections.get(user.userId);
@@ -404,7 +423,11 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       }
 
       if (items.length > 500) {
-        return problem(400, 'Validation Failed', 'The batch exceeds the maximum allowed number of tracks.');
+        return problem(
+          400,
+          'Validation Failed',
+          'The batch exceeds the maximum allowed number of tracks.',
+        );
       }
 
       const invalid = items.some(
@@ -412,7 +435,11 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       );
 
       if (invalid) {
-        return problem(400, 'Validation Failed', 'Every track must include a local track id, title and artist.');
+        return problem(
+          400,
+          'Validation Failed',
+          'Every track must include a local track id, title and artist.',
+        );
       }
 
       let imported = 0;

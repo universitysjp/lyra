@@ -49,7 +49,10 @@ export const decodeTextFrame = (bytes: Uint8Array): string => {
 };
 
 const readSynchsafe = (bytes: Uint8Array): number =>
-  ((bytes[0] & 0x7f) << 21) | ((bytes[1] & 0x7f) << 14) | ((bytes[2] & 0x7f) << 7) | (bytes[3] & 0x7f);
+  ((bytes[0] & 0x7f) << 21) |
+  ((bytes[1] & 0x7f) << 14) |
+  ((bytes[2] & 0x7f) << 7) |
+  (bytes[3] & 0x7f);
 
 const readUInt32 = (bytes: Uint8Array): number =>
   (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
@@ -77,13 +80,22 @@ export const parseId3v2 = (bytes: Uint8Array): Id3Tags => {
 
   // Skip an extended header when present.
   if (bytes[5] & 0x40) {
-    const extendedSize = version >= 4 ? readSynchsafe(bytes.subarray(10, 14)) : readUInt32(bytes.subarray(10, 14));
+    const extendedSize =
+      version >= 4 ? readSynchsafe(bytes.subarray(10, 14)) : readUInt32(bytes.subarray(10, 14));
     offset = 10 + extendedSize;
   }
 
   while (offset + 10 <= end) {
-    const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
-    const size = version >= 4 ? readSynchsafe(bytes.subarray(offset + 4, offset + 8)) : readUInt32(bytes.subarray(offset + 4, offset + 8));
+    const id = String.fromCharCode(
+      bytes[offset],
+      bytes[offset + 1],
+      bytes[offset + 2],
+      bytes[offset + 3],
+    );
+    const size =
+      version >= 4
+        ? readSynchsafe(bytes.subarray(offset + 4, offset + 8))
+        : readUInt32(bytes.subarray(offset + 4, offset + 8));
 
     if (size <= 0 || offset + 10 + size > end) {
       break;
@@ -116,7 +128,10 @@ export const parseId3v2 = (bytes: Uint8Array): Id3Tags => {
 
 /** Fallback metadata derived from a `Artist - Title.mp3` style file name. */
 export const tagsFromFileName = (fileName: string): Id3Tags => {
-  const base = fileName.replace(/\.[^./\\]+$/, '').replace(/_/g, ' ').trim();
+  const base = fileName
+    .replace(/\.[^./\\]+$/, '')
+    .replace(/_/g, ' ')
+    .trim();
   const [first, second] = base.split(/\s+-\s+/);
 
   if (first && second) {

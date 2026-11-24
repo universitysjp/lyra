@@ -66,29 +66,26 @@ const AuthProvider: React.FC<IProps> = ({ children }) => {
     };
   }, [auth, client]);
 
-  const run = useCallback(
-    async (action: () => Promise<Session>): Promise<boolean> => {
-      setBusy(true);
-      setError(null);
+  const run = useCallback(async (action: () => Promise<Session>): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
 
-      try {
-        const issued = await action();
+    try {
+      const issued = await action();
 
-        setSession(issued);
-        setStatus('authenticated');
+      setSession(issued);
+      setStatus('authenticated');
 
-        return true;
-      } catch (caught) {
-        setError(describeError(caught));
-        setStatus('anonymous');
+      return true;
+    } catch (caught) {
+      setError(describeError(caught));
+      setStatus('anonymous');
 
-        return false;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [],
-  );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const login = useCallback(
     (email: string, password: string) => run(() => auth.login(email, password)),

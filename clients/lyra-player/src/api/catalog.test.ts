@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vite-plus/test';
 
 import { createAuthApi } from './auth';
 import { ApiError } from './http';
@@ -71,7 +71,9 @@ describe('catalog api against the fake gateway', () => {
 
   it('refuses items with missing title or artist', async () => {
     const error = await catalog
-      .importTracks([{ localTrackId: 'x', title: '  ', artist: 'Queen', album: null, durationSeconds: 100 }])
+      .importTracks([
+        { localTrackId: 'x', title: '  ', artist: 'Queen', album: null, durationSeconds: 100 },
+      ])
       .catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ApiError);
@@ -167,6 +169,8 @@ describe('catalog api against the fake gateway', () => {
     expect(result.imported).toBe(2);
     expect(otherPage.totalCount).toBe(2);
     expect(ownPage.totalCount).toBe(2);
-    expect(otherPage.items.map((item) => item.id)).not.toEqual(ownPage.items.map((item) => item.id));
+    expect(otherPage.items.map((item) => item.id)).not.toEqual(
+      ownPage.items.map((item) => item.id),
+    );
   });
 });

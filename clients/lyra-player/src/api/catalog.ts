@@ -8,7 +8,11 @@ import type {
 } from '../types/lyra';
 
 export interface CatalogApi {
-  listTracks(page: number, pageSize: number, signal?: AbortSignal): Promise<PagedResponse<TrackDto>>;
+  listTracks(
+    page: number,
+    pageSize: number,
+    signal?: AbortSignal,
+  ): Promise<PagedResponse<TrackDto>>;
   searchTracks(query: string, signal?: AbortSignal): Promise<TrackDto[]>;
   importTracks(tracks: TrackMetadataItem[], signal?: AbortSignal): Promise<ImportTracksResponse>;
   getTrackLyrics(trackId: string, signal?: AbortSignal): Promise<TrackLyricsDto>;

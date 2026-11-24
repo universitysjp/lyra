@@ -148,21 +148,18 @@ const TrackProvider: React.FC<IProps> = ({ children }) => {
     audio.volume = 0;
   }, [lastVolume, muted]);
 
-  const handleProgressChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>): void => {
-      const audio = audioRef.current;
+  const handleProgressChange = useCallback((event: React.ChangeEvent<HTMLInputElement>): void => {
+    const audio = audioRef.current;
 
-      if (!audio) {
-        return;
-      }
+    if (!audio) {
+      return;
+    }
 
-      const value = event.currentTarget.valueAsNumber;
+    const value = event.currentTarget.valueAsNumber;
 
-      setCurrentProgress(value);
-      audio.currentTime = value;
-    },
-    [],
-  );
+    setCurrentProgress(value);
+    audio.currentTime = value;
+  }, []);
 
   const providerValue = useMemo<ITrackContext>(
     () => ({

@@ -2,11 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import useTrack from '../../hooks/useTrack';
 import useTrackLyrics from '../../hooks/useTrackLyrics';
-import {
-  activeLyricIndex,
-  parseSyncedLyrics,
-  splitPlainLyrics,
-} from '../../utils/lyrics';
+import { activeLyricIndex, parseSyncedLyrics, splitPlainLyrics } from '../../utils/lyrics';
 
 interface IProps {
   open: boolean;
@@ -114,11 +110,7 @@ const LyricsPanel: React.FC<IProps> = ({ open, onClose }) => {
         </button>
       </header>
       <div className='lyrics-scroll'>{renderBody()}</div>
-      {isSynced && (
-        <footer className='lyrics-footer muted small'>
-          Tap a line to jump to it.
-        </footer>
-      )}
+      {isSynced && <footer className='lyrics-footer muted small'>Tap a line to jump to it.</footer>}
     </aside>
   );
 };

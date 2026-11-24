@@ -188,7 +188,9 @@ const SettingsPage: React.FC = () => {
       <header className='page-head'>
         <div>
           <h1 className='page-title'>AI provider</h1>
-          <p className='page-sub'>Choose the model that reads your lyrics and describes each track.</p>
+          <p className='page-sub'>
+            Choose the model that reads your lyrics and describes each track.
+          </p>
         </div>
       </header>
 
@@ -300,7 +302,9 @@ const SettingsPage: React.FC = () => {
                   type={showKey ? 'text' : 'password'}
                   name='apiKey'
                   value={apiKey}
-                  placeholder={connection ? 'Enter the key again to save' : 'Paste your provider key'}
+                  placeholder={
+                    connection ? 'Enter the key again to save' : 'Paste your provider key'
+                  }
                   autoComplete='off'
                   spellCheck={false}
                   onChange={(event) => setApiKey(event.target.value)}

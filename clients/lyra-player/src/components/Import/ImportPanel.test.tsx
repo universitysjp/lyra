@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -71,7 +71,9 @@ describe('ImportPanel', () => {
     await render();
 
     expect(screen.getByRole('button', { name: /Add to library/ })).toBeDisabled();
-    expect(screen.getByText(/Choose files to see them here before adding them/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Choose files to see them here before adding them/),
+    ).toBeInTheDocument();
   });
 
   it('previews extracted tags and sends them as one batch', async () => {
@@ -81,7 +83,7 @@ describe('ImportPanel', () => {
 
     expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
     expect(screen.getByText('Sultans of Swing')).toBeInTheDocument();
-        expect(screen.getAllByText('05:00')).toHaveLength(2);
+    expect(screen.getAllByText('05:00')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: /Add 2 to library/ }));
 

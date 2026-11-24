@@ -92,8 +92,7 @@ const toError = (response: Response, problem: ProblemDetails | null): ApiError =
  */
 export const createLyraClient = (options: LyraClientOptions): LyraClient => {
   const { store, baseUrl = '', onSessionLost } = options;
-  const fetchImpl: typeof fetch = (...args) =>
-    (options.fetchImpl ?? globalThis.fetch)(...args);
+  const fetchImpl: typeof fetch = (...args) => (options.fetchImpl ?? globalThis.fetch)(...args);
 
   let current = store.load();
   let inflight: Promise<Session | null> | null = null;

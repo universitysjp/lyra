@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vite-plus/test';
 
 import { createAuthApi } from './auth';
 import { ApiError, createLyraClient } from './http';
@@ -55,7 +55,9 @@ describe('auth api against the fake gateway', () => {
 
     await auth.register('solo@example.com', 'AnotherPassword!');
 
-    await expect(auth.register('solo@example.com', 'AnotherPassword!')).rejects.toThrow(/already registered/);
+    await expect(auth.register('solo@example.com', 'AnotherPassword!')).rejects.toThrow(
+      /already registered/,
+    );
   });
 
   it('reads the profile through GET /api/auth/me', async () => {
@@ -65,7 +67,10 @@ describe('auth api against the fake gateway', () => {
 
     const profile = await auth.me();
 
-    expect(profile).toMatchObject({ email: DEMO_EMAIL, userId: '11111111-1111-1111-1111-111111111111' });
+    expect(profile).toMatchObject({
+      email: DEMO_EMAIL,
+      userId: '11111111-1111-1111-1111-111111111111',
+    });
     expect(backend.requests).toContain('POST /api/auth/login');
     expect(backend.requests).toContain('GET /api/auth/me');
   });

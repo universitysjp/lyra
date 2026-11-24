@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import { isImportable, probeDuration, readLocalTrack, toLocalTrackId } from './localFiles';
 import { taggedHeader } from '../test/id3Fixture';

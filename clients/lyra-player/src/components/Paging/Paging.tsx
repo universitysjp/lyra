@@ -8,7 +8,14 @@ interface IProps {
 }
 
 /** Page controls for the library. */
-const Paging: React.FC<IProps> = ({ page, totalPages, totalCount, pageSize, loading = false, onChange }) => {
+const Paging: React.FC<IProps> = ({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  loading = false,
+  onChange,
+}) => {
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(totalCount, page * pageSize);
 

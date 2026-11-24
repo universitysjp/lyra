@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import { decodeTextFrame, findId3Header, parseId3v2, tagsFromFileName } from './id3';
 import { binaryFrame, buildId3Tag, textFrame, textFrameV4, u8 } from '../test/id3Fixture';

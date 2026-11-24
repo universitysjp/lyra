@@ -52,10 +52,7 @@ const complete = (transaction: IDBTransaction): Promise<void> =>
   });
 
 /** Stores one local file. Resolves silently when IndexedDB is unavailable. */
-export const persistLocalAudio = async (
-  localTrackId: string,
-  file: Blob,
-): Promise<void> => {
+export const persistLocalAudio = async (localTrackId: string, file: Blob): Promise<void> => {
   const database = await getDatabase();
 
   if (!database) {

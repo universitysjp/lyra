@@ -29,7 +29,8 @@ export const toTrack = (dto: TrackDto, no: number): ITrack => {
   };
 };
 
-export const toTracks = (dtos: TrackDto[]): ITrack[] => dtos.map((dto, index) => toTrack(dto, index + 1));
+export const toTracks = (dtos: TrackDto[]): ITrack[] =>
+  dtos.map((dto, index) => toTrack(dto, index + 1));
 
 /** Re-reads the local audio registry, e.g. after the user attaches a file. */
 export const withLocalAudio = (tracks: ITrack[]): ITrack[] =>

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -28,13 +28,20 @@ const track = (overrides: Partial<ITrack> = {}): ITrack => ({
 
 describe('TrackList', () => {
   it('shows the empty label when the library page is empty', () => {
-    renderWithProviders(<TrackList tracks={[]} onAttach={vi.fn()} emptyLabel='Nothing synced yet.' />);
+    renderWithProviders(
+      <TrackList tracks={[]} onAttach={vi.fn()} emptyLabel='Nothing synced yet.' />,
+    );
 
     expect(screen.getByText('Nothing synced yet.')).toBeInTheDocument();
   });
 
   it('renders one row per track with its catalog metadata', () => {
-    renderWithProviders(<TrackList tracks={[track(), track({ id: 'track-2', name: 'Take Five' })]} onAttach={vi.fn()} />);
+    renderWithProviders(
+      <TrackList
+        tracks={[track(), track({ id: 'track-2', name: 'Take Five' })]}
+        onAttach={vi.fn()}
+      />,
+    );
 
     expect(screen.getByRole('list')).toBeInTheDocument();
     expect(screen.getByText('Bohemian Rhapsody')).toBeInTheDocument();
@@ -51,7 +58,10 @@ describe('TrackList', () => {
 
   it('hides the link action when audio is already on this device', () => {
     renderWithProviders(
-      <TrackList tracks={[track({ mediaurl: 'blob:local-1', hasLyrics: true })]} onAttach={vi.fn()} />,
+      <TrackList
+        tracks={[track({ mediaurl: 'blob:local-1', hasLyrics: true })]}
+        onAttach={vi.fn()}
+      />,
     );
 
     expect(screen.queryByRole('button', { name: 'Link file' })).not.toBeInTheDocument();

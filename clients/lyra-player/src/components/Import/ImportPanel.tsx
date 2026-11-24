@@ -61,9 +61,7 @@ const ImportPanel: React.FC = () => {
       return;
     }
 
-    pending.forEach((track) =>
-      registerLocalAudio(track.localTrackId, track.objectUrl, track.file),
-    );
+    pending.forEach((track) => registerLocalAudio(track.localTrackId, track.objectUrl, track.file));
     setPending([]);
   }, [importTracks, pending]);
 
@@ -184,12 +182,7 @@ const ImportPanel: React.FC = () => {
         <p className='result'>
           Added <strong>{lastImport.imported}</strong>{' '}
           {lastImport.imported === 1 ? 'track' : 'tracks'}.
-          {lastImport.duplicates > 0 && (
-            <>
-              {' '}
-              {lastImport.duplicates} already in your library.
-            </>
-          )}
+          {lastImport.duplicates > 0 && <> {lastImport.duplicates} already in your library.</>}
         </p>
       )}
     </section>

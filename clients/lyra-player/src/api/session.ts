@@ -18,7 +18,8 @@ const STORAGE_KEY = 'lyra.session';
 
 /** localStorage-backed store used by the browser build. */
 export const createSessionStore = (
-  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = globalThis.localStorage ?? null,
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = globalThis.localStorage ??
+    null,
 ): SessionStore => {
   if (!storage) {
     return createMemorySessionStore();

@@ -19,7 +19,9 @@ export interface ILibraryContext {
   reload: () => void;
   /** Loads the whole library once (max page size) so the album grid can group it. */
   loadAlbums: () => Promise<IAlbumGroup[]>;
-  importTracks: (items: TrackMetadataItem[]) => Promise<{ submitted: number; imported: number; duplicates: number } | null>;
+  importTracks: (
+    items: TrackMetadataItem[],
+  ) => Promise<{ submitted: number; imported: number; duplicates: number } | null>;
   /** Registers a locally picked audio file for a track so it becomes playable. */
   attachAudio: (localTrackId: string, file: File) => void;
 }

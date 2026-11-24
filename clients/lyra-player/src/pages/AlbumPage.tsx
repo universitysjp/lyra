@@ -77,8 +77,7 @@ const AlbumPage: React.FC = () => {
       return;
     }
 
-    const start =
-      album.tracks.find((track: ITrack) => Boolean(track.mediaurl)) ?? album.tracks[0];
+    const start = album.tracks.find((track: ITrack) => Boolean(track.mediaurl)) ?? album.tracks[0];
 
     if (start) {
       playTrack(start, album.tracks);
@@ -124,7 +123,9 @@ const AlbumPage: React.FC = () => {
           <div className='album-meta'>
             <Link to='/albums'>{album.artist}</Link>
             <span className='dot' aria-hidden='true' />
-            <span>{album.songs} {album.songs === 1 ? 'track' : 'tracks'}</span>
+            <span>
+              {album.songs} {album.songs === 1 ? 'track' : 'tracks'}
+            </span>
             <span className='dot' aria-hidden='true' />
             <span>{album.minutes === 0 ? 'under a minute' : `${album.minutes} min`}</span>
           </div>

@@ -2,14 +2,17 @@
   "name": "lyra-player",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "React reference client for the Lyra backend, based on the open-source react-music-player template.",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "dev": "vp dev",
+    "build": "tsc --noEmit && vp build",
+    "preview": "vp preview",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "lint": "vp lint",
+    "format": "vp fmt",
+    "check": "vp check",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,10 +28,13 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^4.5.0",
+    "@vitejs/plugin-react": "^5",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.3",
-    "vite": "^6.3.5",
-    "vitest": "^3.2.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.6.0",
+    "vite-plus": "1.6.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.6.0"
   }
 }

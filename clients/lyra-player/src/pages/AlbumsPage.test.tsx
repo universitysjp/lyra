@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -15,12 +15,16 @@ describe('AlbumsPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Albums' })).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getAllByRole('link').filter((link) =>
-        link.getAttribute('href')?.startsWith('/album/'),
-      )).toHaveLength(2),
+      expect(
+        screen
+          .getAllByRole('link')
+          .filter((link) => link.getAttribute('href')?.startsWith('/album/')),
+      ).toHaveLength(2),
     );
 
-    const cards = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/album/'));
+    const cards = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/album/'));
     const queenCard = cards.find(
       (card) => card.getAttribute('href') === '/album/queen%2Fa-night-at-the-opera',
     );
@@ -42,7 +46,9 @@ describe('AlbumsPage', () => {
 
     await userEvent.click(card);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'A Night at the Opera' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'A Night at the Opera' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Queen' })).toHaveAttribute('href', '/albums');
     expect(screen.getByText('1 track')).toBeInTheDocument();
     expect(screen.getByText('6 min')).toBeInTheDocument();

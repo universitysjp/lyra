@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import { albumGroupId, artworkFor } from './artwork';
 
@@ -14,7 +14,9 @@ describe('artworkFor', () => {
   });
 
   it('is deterministic per seed and differs across seeds', () => {
-    expect(artworkFor('Dire Straits', 'Dire Straits')).toBe(artworkFor('Dire Straits', 'Dire Straits'));
+    expect(artworkFor('Dire Straits', 'Dire Straits')).toBe(
+      artworkFor('Dire Straits', 'Dire Straits'),
+    );
     expect(artworkFor('Queen', 'Queen')).not.toBe(artworkFor('Adele', 'Adele'));
   });
 

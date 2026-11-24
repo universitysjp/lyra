@@ -88,21 +88,18 @@ const LibraryProvider: React.FC<IProps> = ({ children }) => {
     [albumDtos, dtos, audioVersion],
   );
 
-  const loadAlbums = useCallback(
-    async (): Promise<IAlbumGroup[]> => {
-      if (albumsLoaded) {
-        return albums;
-      }
+  const loadAlbums = useCallback(async (): Promise<IAlbumGroup[]> => {
+    if (albumsLoaded) {
+      return albums;
+    }
 
-      const result = await catalog.listTracks(1, ALBUM_PAGE_SIZE);
+    const result = await catalog.listTracks(1, ALBUM_PAGE_SIZE);
 
-      setAlbumDtos(result.items);
-      setAlbumsLoaded(true);
+    setAlbumDtos(result.items);
+    setAlbumsLoaded(true);
 
-      return groupByAlbum(withLocalAudio(toTracks(result.items)));
-    },
-    [albums, albumsLoaded, catalog],
-  );
+    return groupByAlbum(withLocalAudio(toTracks(result.items)));
+  }, [albums, albumsLoaded, catalog]);
 
   const importTracks = useCallback(
     async (items: TrackMetadataItem[]) => {

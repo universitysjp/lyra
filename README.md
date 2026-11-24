@@ -197,6 +197,21 @@ LRCLIB matching is configurable in `Lyra.Enrichment.Worker/appsettings.json` und
 
 Transient failures (`408`, `429`, `5xx`, network timeouts) are never cached; they surface as `LrclibRequestException` so MassTransit retries them.
 
+### Run the React Client
+
+The client uses Vite+ (`vp`) as its single toolchain: the dev server, production build, Vitest tests, Oxlint, and Oxfmt all come from the `vite-plus` dependency. There is no separate `vite`, `vitest`, or `prettier` install.
+
+```bash
+cd clients/lyra-player
+bun install
+bun run dev        # http://localhost:3000, proxies /api to http://localhost:5000
+bun run check      # format check + lint + type check
+bun run test       # Vitest
+bun run build      # production build
+```
+
+Set `VITE_BACKEND_URL` in a local `.env.local` file to point the dev proxy at a different gateway.
+
 ### Local Files and Lyrics in the React Client
 
 The React reference client stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 import {
   groupByAlbum,
@@ -63,10 +63,7 @@ describe('toTrack', () => {
 
 describe('toTracks', () => {
   it('numbers rows in the order the backend returned them', () => {
-    const tracks = toTracks([
-      dto({ id: 'a', title: 'First' }),
-      dto({ id: 'b', title: 'Second' }),
-    ]);
+    const tracks = toTracks([dto({ id: 'a', title: 'First' }), dto({ id: 'b', title: 'Second' })]);
 
     expect(tracks.map((track) => [track.no, track.name])).toEqual([
       [1, 'First'],
@@ -157,7 +154,11 @@ describe('toMetadataItems', () => {
 
 describe('totalSeconds', () => {
   it('sums durations for the library header', () => {
-    expect(totalSeconds(toTracks([dto({ durationSeconds: 100 }), dto({ id: 'z', durationSeconds: 200 })]))).toBe(300);
+    expect(
+      totalSeconds(
+        toTracks([dto({ durationSeconds: 100 }), dto({ id: 'z', durationSeconds: 200 })]),
+      ),
+    ).toBe(300);
     expect(totalSeconds([])).toBe(0);
   });
 });
