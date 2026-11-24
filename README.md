@@ -80,7 +80,7 @@ Lyra.Catalog.Api/
 Lyra.AI/                 # Shared Microsoft.Extensions.AI provider adapter
 Lyra.Enrichment.Worker/
 Lyra.PlaylistRag.Api/
-prototype/lyra-player/   # React/Vite client used to exercise the backend
+clients/lyra-player/      # React/Vite reference client used to exercise the backend
 tests/
   Lyra.Identity.Api.Tests/
   Lyra.Catalog.Api.Tests/
@@ -199,7 +199,7 @@ Transient failures (`408`, `429`, `5xx`, network timeouts) are never cached; the
 
 ### Local Files and Lyrics in the React Client
 
-The React prototype stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
+The React reference client stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
 
 When a track is playing, the player exposes a lyrics button. Synced LRC lines highlight and auto-scroll with playback and can be clicked to seek; plain lyrics are rendered as static text. The panel fetches only the current track's lyrics from the dedicated endpoint.
 

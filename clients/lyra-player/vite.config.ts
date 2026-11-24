@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// The prototype talks to the Lyra gateway through a dev proxy so the browser stays
+// The reference client talks to the Lyra gateway through a dev proxy so the browser stays
 // same-origin and no CORS configuration is needed on the backend.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');

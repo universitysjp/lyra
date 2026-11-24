@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "React prototype client for the Lyra backend, based on the open-source react-music-player template.",
+  "description": "React reference client for the Lyra backend, based on the open-source react-music-player template.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
