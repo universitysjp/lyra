@@ -13,9 +13,9 @@ describe('SettingsPage', () => {
 
     renderApp({ route: '/settings', backend, session });
 
-    expect(await screen.findByRole('heading', { name: 'AI enrichment' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'AI provider' })).toBeInTheDocument();
     await waitForSettingsForm();
-    expect(screen.getByText('No provider is configured for this account.')).toBeInTheDocument();
+    expect(screen.getByText('No provider configured yet.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Connect provider/ })).toBeInTheDocument();
   });
 
@@ -27,7 +27,7 @@ describe('SettingsPage', () => {
 
     await waitForSettingsForm();
 
-    await userEvent.type(screen.getByLabelText('Model ID'), 'gpt-test');
+    await userEvent.type(screen.getByLabelText('Model'), 'gpt-test');
     await userEvent.type(screen.getByLabelText('API key'), 'sk-secret');
 
     const keyInput = screen.getByLabelText('API key') as HTMLInputElement;
@@ -39,10 +39,10 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Connect provider/ }));
 
     expect(
-      await screen.findByText(/AI provider saved. New enrichment jobs will use this connection./),
+      await screen.findByText(/Provider saved. New tracks will use this connection./),
     ).toBeInTheDocument();
     expect(screen.getByText('Connected')).toBeInTheDocument();
-    expect(screen.getByText('OpenAI API · gpt-test')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI · gpt-test')).toBeInTheDocument();
     expect(keyInput.value).toBe('');
 
     const stored = backend.aiConnections.get(session.userId);
@@ -59,13 +59,13 @@ describe('SettingsPage', () => {
     await waitForSettingsForm();
 
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'OpenCode');
-    await userEvent.selectOptions(await screen.findByLabelText('OpenCode plan'), 'Go');
-    await userEvent.type(screen.getByLabelText('Model ID'), 'deepseek-v4.1-flash');
+    await userEvent.selectOptions(await screen.findByLabelText('Plan'), 'Go');
+    await userEvent.type(screen.getByLabelText('Model'), 'deepseek-v4.1-flash');
     await userEvent.type(screen.getByLabelText('API key'), 'oc-secret');
     await userEvent.click(screen.getByRole('button', { name: /Connect provider/ }));
 
-    expect(await screen.findByText(/AI provider saved/)).toBeInTheDocument();
-    expect(screen.getByText('OpenCode Console · deepseek-v4.1-flash · Go')).toBeInTheDocument();
+    expect(await screen.findByText(/Provider saved/)).toBeInTheDocument();
+    expect(screen.getByText('OpenCode · deepseek-v4.1-flash · Go')).toBeInTheDocument();
     expect(backend.aiConnections.get(session.userId)?.openCodePlan).toBe('Go');
   });
 
@@ -76,25 +76,25 @@ describe('SettingsPage', () => {
     renderApp({ route: '/settings', backend, session });
 
     await waitForSettingsForm();
-    await userEvent.type(screen.getByLabelText('Model ID'), 'gpt-test');
+    await userEvent.type(screen.getByLabelText('Model'), 'gpt-test');
     await userEvent.type(screen.getByLabelText('API key'), 'sk-secret');
     await userEvent.click(screen.getByRole('button', { name: /Connect provider/ }));
-    await screen.findByText(/AI provider saved/);
+    await screen.findByText(/Provider saved/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(
-      screen.getByText(/Disconnect this provider\? Imported tracks stay in your library/),
+      screen.getByText(/Disconnect this provider\? Your tracks stay/),
     ).toBeInTheDocument();
 
     const confirmation = screen.getByText(/Disconnect this provider\?/).closest('.confirm-row');
     expect(confirmation).not.toBeNull();
 
     await userEvent.click(
-      within(confirmation as HTMLElement).getByRole('button', { name: 'Disconnect provider' }),
+      within(confirmation as HTMLElement).getByRole('button', { name: 'Disconnect' }),
     );
 
     expect(
-      await screen.findByText(/AI provider disconnected. Tracks will remain unenriched/),
+      await screen.findByText(/Provider disconnected. Tracks stay in your library/),
     ).toBeInTheDocument();
     expect(screen.getByText('Not connected')).toBeInTheDocument();
     expect(backend.aiConnections.has(session.userId)).toBe(false);
@@ -109,16 +109,16 @@ describe('SettingsPage', () => {
     await waitForSettingsForm();
 
     await userEvent.click(screen.getByRole('button', { name: /Connect provider/ }));
-    expect(screen.getByText('Enter the model ID you want Lyra to call.')).toBeInTheDocument();
+    expect(screen.getByText('Enter the model you want Lyra to use.')).toBeInTheDocument();
 
-    await userEvent.type(screen.getByLabelText('Model ID'), 'gpt-test');
+    await userEvent.type(screen.getByLabelText('Model'), 'gpt-test');
     await userEvent.click(screen.getByRole('button', { name: /Connect provider/ }));
-    expect(screen.getByText('Enter your provider API key.')).toBeInTheDocument();
+    expect(screen.getByText('Enter your provider key.')).toBeInTheDocument();
     expect(backend.requests).not.toContain('PUT /api/auth/ai-connection');
   });
 });
 
 const waitForSettingsForm = async (): Promise<void> => {
   await screen.findByText('Not connected');
-  await waitFor(() => expect(screen.getByLabelText('Model ID')).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText('Model')).toBeEnabled());
 };

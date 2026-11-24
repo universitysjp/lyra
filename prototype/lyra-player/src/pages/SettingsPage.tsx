@@ -2,13 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Link } from 'react-router-dom';
 
-// components
 import Banner from '../components/Feedback/Banner';
 
-// hooks
 import useApi from '../hooks/useApi';
 
-// utils
 import { describeError } from '../api/errors';
 
 import type { AiConnectionDto, AiProvider, OpenCodePlan } from '../types/lyra';
@@ -21,24 +18,24 @@ interface IProviderDetails {
 
 const PROVIDERS: Record<AiProvider, IProviderDetails> = {
   OpenAI: {
-    label: 'OpenAI API',
+    label: 'OpenAI',
     modelPlaceholder: 'gpt-5-mini',
-    hint: 'Uses an OpenAI Platform API key. ChatGPT Plus or Pro subscriptions are not API keys.',
+    hint: 'Use an OpenAI Platform API key. ChatGPT subscriptions are not API keys.',
   },
   Gemini: {
     label: 'Google Gemini',
     modelPlaceholder: 'gemini-3.5-flash',
-    hint: 'Uses a Gemini API key from Google AI Studio.',
+    hint: 'Use a Gemini API key from Google AI Studio.',
   },
   OpenCode: {
-    label: 'OpenCode Console',
+    label: 'OpenCode',
     modelPlaceholder: 'deepseek-v4.1-flash',
-    hint: 'OpenCode free-tier models are not available to external clients. Use a paid model or Go plan.',
+    hint: 'Choose a paid model or a Go plan. Free-tier models are not available to external apps.',
   },
   Anthropic: {
-    label: 'Anthropic Claude',
+    label: 'Anthropic',
     modelPlaceholder: 'claude-sonnet-4-6',
-    hint: 'Uses an Anthropic API key. Choose a model that supports structured JSON output.',
+    hint: 'Use an Anthropic API key and a model that supports structured JSON output.',
   },
 };
 
@@ -60,10 +57,7 @@ const formatUpdatedAt = (value: string): string => {
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
 };
 
-/**
- * BYOK settings for enrichment. The backend stores the provider credential encrypted
- * in identity_db and only ever returns provider/model/plan metadata.
- */
+/** Connect the listener's own AI provider for mood, theme and energy enrichment. */
 const SettingsPage: React.FC = () => {
   const { aiConnections } = useApi();
 
@@ -132,7 +126,7 @@ const SettingsPage: React.FC = () => {
     setNotice(null);
 
     if (!model.trim()) {
-      setError('Enter the model ID you want Lyra to call.');
+      setError('Enter the model you want Lyra to use.');
 
       return;
     }
@@ -140,8 +134,8 @@ const SettingsPage: React.FC = () => {
     if (!apiKey.trim()) {
       setError(
         connection
-          ? 'Enter the API key again to save changes. Lyra cannot read the stored key back.'
-          : 'Enter your provider API key.',
+          ? 'Enter the key again to save changes. It cannot be read back.'
+          : 'Enter your provider key.',
       );
 
       return;
@@ -160,7 +154,7 @@ const SettingsPage: React.FC = () => {
       setConnection(saved);
       setApiKey('');
       setShowKey(false);
-      setNotice('AI provider saved. New enrichment jobs will use this connection.');
+      setNotice('Provider saved. New tracks will use this connection.');
     } catch (caught: unknown) {
       setError(describeError(caught));
     } finally {
@@ -181,7 +175,7 @@ const SettingsPage: React.FC = () => {
       setModel('');
       setApiKey('');
       setOpenCodePlan('PayAsYouGo');
-      setNotice('AI provider disconnected. Tracks will remain unenriched until you reconnect.');
+      setNotice('Provider disconnected. Tracks stay in your library.');
     } catch (caught: unknown) {
       setError(describeError(caught));
     } finally {
@@ -190,186 +184,170 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className='settings flex flex-column flex-gap no-select'>
-      <div className='container flex flex-column flex-gap'>
-        <section className='hero flex flex-column flex-gap-small'>
-          <h1>AI enrichment</h1>
-          <em>Your provider, your model, your API key.</em>
-          <p className='muted'>
-            Lyra sends lyrics and track metadata to the provider you choose. The key is encrypted
-            in <code>identity_db</code>, used only by the enrichment worker, and never returned by
-            the API.
-          </p>
-        </section>
+    <div className='page settings-page no-select'>
+      <header className='page-head'>
+        <div>
+          <h1 className='page-title'>AI provider</h1>
+          <p className='page-sub'>Choose the model that reads your lyrics and describes each track.</p>
+        </div>
+      </header>
 
-        <Banner message={error} onDismiss={() => setError(null)} />
-        <Banner kind='success' message={notice} onDismiss={() => setNotice(null)} />
+      <Banner message={error} onDismiss={() => setError(null)} />
+      <Banner kind='success' message={notice} onDismiss={() => setNotice(null)} />
 
-        <div className='settings-layout'>
-          <section className='settings-form flex flex-column flex-gap' aria-busy={loading}>
-            <div className='connection-state flex flex-gap flex-v-center flex-space-between'>
-              <div className='flex flex-column flex-gap-small'>
-                <span className={connection ? 'chip chip-ok' : 'chip chip-muted'}>
-                  {loading ? 'Checking connection' : connection ? 'Connected' : 'Not connected'}
-                </span>
-                <strong>
-                  {connection
-                    ? providerSummary(connection)
-                    : 'No provider is configured for this account.'}
-                </strong>
-                {connection && (
-                  <span className='muted small'>
-                    Updated {formatUpdatedAt(connection.updatedAt)}
-                  </span>
-                )}
-              </div>
-
-              {connection && !confirmingDelete && (
-                <button
-                  type='button'
-                  className='button black'
-                  onClick={() => setConfirmingDelete(true)}
-                  disabled={busy}
-                >
-                  Disconnect
-                </button>
+      <div className='settings-grid'>
+        <section className='settings-panel' aria-busy={loading}>
+          <div className='settings-state'>
+            <div className='flex flex-column flex-gap-small'>
+              <span className={connection ? 'status-pill connected' : 'status-pill'}>
+                {loading ? 'Checking' : connection ? 'Connected' : 'Not connected'}
+              </span>
+              <strong>
+                {connection ? providerSummary(connection) : 'No provider configured yet.'}
+              </strong>
+              {connection && (
+                <span className='muted small'>Updated {formatUpdatedAt(connection.updatedAt)}</span>
               )}
             </div>
 
-            {confirmingDelete && (
-              <div className='confirm-row flex flex-gap flex-v-center flex-space-between'>
-                <p className='muted small'>
-                  Disconnect this provider? Imported tracks stay in your library, but enrichment
-                  pauses until another provider is connected.
-                </p>
-                <div className='flex flex-gap-small'>
-                  <button
-                    type='button'
-                    className='button danger'
-                    onClick={() => void disconnect()}
-                    disabled={removing}
-                  >
-                    {removing ? 'Disconnecting...' : 'Disconnect provider'}
-                  </button>
-                  <button
-                    type='button'
-                    className='button black'
-                    onClick={() => setConfirmingDelete(false)}
-                    disabled={removing}
-                  >
-                    Keep it
-                  </button>
-                </div>
-              </div>
+            {connection && !confirmingDelete && (
+              <button
+                type='button'
+                className='btn btn-ghost'
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy}
+              >
+                Disconnect
+              </button>
             )}
+          </div>
 
-            <form className='flex flex-column flex-gap' onSubmit={(event) => void save(event)}>
-              <label className='field flex flex-column flex-gap-small'>
-                <span>Provider</span>
+          {confirmingDelete && (
+            <div className='confirm-row'>
+              <p>
+                Disconnect this provider? Your tracks stay, but new enrichment will pause until you
+                connect another one.
+              </p>
+              <div className='flex flex-gap-small'>
+                <button
+                  type='button'
+                  className='btn btn-danger btn-sm'
+                  onClick={() => void disconnect()}
+                  disabled={removing}
+                >
+                  {removing ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+                <button
+                  type='button'
+                  className='btn btn-ghost btn-sm'
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={removing}
+                >
+                  Keep it
+                </button>
+              </div>
+            </div>
+          )}
+
+          <form className='auth-form' onSubmit={(event) => void save(event)}>
+            <label className='field'>
+              <span>Provider</span>
+              <select
+                value={provider}
+                onChange={(event) => chooseProvider(event.target.value as AiProvider)}
+                disabled={busy}
+              >
+                {PROVIDER_ORDER.map((value) => (
+                  <option key={value} value={value}>
+                    {PROVIDERS[value].label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className='field'>
+              <span>Model</span>
+              <input
+                type='text'
+                name='model'
+                value={model}
+                placeholder={selectedProvider.modelPlaceholder}
+                autoComplete='off'
+                spellCheck={false}
+                onChange={(event) => setModel(event.target.value)}
+                disabled={busy}
+              />
+            </label>
+
+            {provider === 'OpenCode' && (
+              <label className='field'>
+                <span>Plan</span>
                 <select
-                  value={provider}
-                  onChange={(event) => chooseProvider(event.target.value as AiProvider)}
+                  value={openCodePlan}
+                  onChange={(event) => setOpenCodePlan(event.target.value as OpenCodePlan)}
                   disabled={busy}
                 >
-                  {PROVIDER_ORDER.map((value) => (
-                    <option key={value} value={value}>
-                      {PROVIDERS[value].label}
-                    </option>
-                  ))}
+                  <option value='PayAsYouGo'>Pay as you go</option>
+                  <option value='Go'>Go subscription</option>
                 </select>
               </label>
+            )}
 
-              <label className='field flex flex-column flex-gap-small'>
-                <span>Model ID</span>
+            <label className='field'>
+              <span>API key</span>
+              <div className='key-control'>
                 <input
-                  type='text'
-                  name='model'
-                  value={model}
-                  placeholder={selectedProvider.modelPlaceholder}
+                  type={showKey ? 'text' : 'password'}
+                  name='apiKey'
+                  value={apiKey}
+                  placeholder={connection ? 'Enter the key again to save' : 'Paste your provider key'}
                   autoComplete='off'
                   spellCheck={false}
-                  onChange={(event) => setModel(event.target.value)}
+                  onChange={(event) => setApiKey(event.target.value)}
                   disabled={busy}
                 />
-              </label>
-
-              {provider === 'OpenCode' && (
-                <label className='field flex flex-column flex-gap-small'>
-                  <span>OpenCode plan</span>
-                  <select
-                    value={openCodePlan}
-                    onChange={(event) => setOpenCodePlan(event.target.value as OpenCodePlan)}
-                    disabled={busy}
-                  >
-                    <option value='PayAsYouGo'>Pay as you go</option>
-                    <option value='Go'>Go subscription</option>
-                  </select>
-                </label>
-              )}
-
-              <label className='field flex flex-column flex-gap-small'>
-                <span>API key</span>
-                <div className='key-control flex flex-gap-small'>
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    name='apiKey'
-                    value={apiKey}
-                    placeholder={
-                      connection
-                        ? 'Enter the key again to save changes'
-                        : 'Paste your provider API key'
-                    }
-                    autoComplete='off'
-                    spellCheck={false}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    disabled={busy}
-                  />
-                  <button
-                    type='button'
-                    className='button black'
-                    aria-pressed={showKey}
-                    onClick={() => setShowKey((value) => !value)}
-                    disabled={busy || apiKey.length === 0}
-                  >
-                    {showKey ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </label>
-
-              <p className='muted small provider-hint'>{selectedProvider.hint}</p>
-
-              <div className='flex flex-gap flex-v-center settings-actions'>
-                <button type='submit' className='button primary' disabled={busy}>
-                  <span className='material-symbols-outlined' aria-hidden='true'>
-                    key
-                  </span>
-                  <span>
-                    {saving ? 'Saving...' : connection ? 'Save connection' : 'Connect provider'}
-                  </span>
+                <button
+                  type='button'
+                  className='btn btn-ghost'
+                  aria-pressed={showKey}
+                  onClick={() => setShowKey((value) => !value)}
+                  disabled={busy || apiKey.length === 0}
+                >
+                  {showKey ? 'Hide' : 'Show'}
                 </button>
-                <Link to='/import' className='button black'>
-                  Sync tracks
-                </Link>
               </div>
-            </form>
-          </section>
+            </label>
 
-          <aside className='settings-guidance flex flex-column flex-gap-small'>
-            <h2>What happens after you connect</h2>
-            <p>
-              New imports publish an enrichment job. The worker asks your provider for mood, themes
-              and energy, then stores the result on the shared track record.
-            </p>
-            <p>
-              Usage is billed by your provider account. Entering an API key here does not change
-              your provider plan or create a Lyra subscription.
-            </p>
-            <p>
-              Tracks imported before connecting remain in the library and stay unenriched. Future
-              imports are processed with the connection you save here.
-            </p>
-          </aside>
-        </div>
+            <p className='muted small'>{selectedProvider.hint}</p>
+
+            <div className='settings-actions'>
+              <button type='submit' className='btn btn-primary' disabled={busy}>
+                <span className='material-symbols-outlined' aria-hidden='true'>
+                  key
+                </span>
+                {saving ? 'Saving…' : connection ? 'Save changes' : 'Connect provider'}
+              </button>
+              <Link to='/import' className='btn btn-ghost'>
+                Add music
+              </Link>
+            </div>
+          </form>
+        </section>
+
+        <aside className='settings-aside'>
+          <h2>What this powers</h2>
+          <p>
+            Every new track can carry a mood, a few themes and an energy level. That is what makes
+            search and playlists feel aware of the music, not just the file names.
+          </p>
+          <p>
+            Lyrics are stored as soon as they are found. If the provider is unavailable, the words
+            stay in your library and enrichment catches up later.
+          </p>
+          <p>
+            Your key is encrypted, belongs to your provider account, and is never shown back to you.
+          </p>
+        </aside>
       </div>
     </div>
   );

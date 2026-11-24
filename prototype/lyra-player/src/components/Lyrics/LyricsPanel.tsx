@@ -103,7 +103,7 @@ const LyricsPanel: React.FC<IProps> = ({ open, onClose }) => {
         </div>
         <button
           type='button'
-          className='icon-button'
+          className='icon-btn'
           onClick={onClose}
           title='Close lyrics'
           aria-label='Close lyrics'
@@ -116,7 +116,7 @@ const LyricsPanel: React.FC<IProps> = ({ open, onClose }) => {
       <div className='lyrics-scroll'>{renderBody()}</div>
       {isSynced && (
         <footer className='lyrics-footer muted small'>
-          Synced lyrics - tap a line to jump.
+          Tap a line to jump to it.
         </footer>
       )}
     </aside>

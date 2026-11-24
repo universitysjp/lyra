@@ -18,8 +18,8 @@ describe('Paging', () => {
   it('describes the slice of the library that is on screen', () => {
     withPager();
 
-    expect(screen.getByText('51-100 of 120')).toBeInTheDocument();
-    expect(screen.getByText('page 2 / 3')).toBeInTheDocument();
+    expect(screen.getByText('51–100 of 120')).toBeInTheDocument();
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
   });
 
   it('marks the edges of the result set', () => {

@@ -1,89 +1,61 @@
-import { useState } from 'react';
-
 import { Link } from 'react-router-dom';
 
-// components
 import ImportPanel from '../components/Import/ImportPanel';
 
-// data
-import { SAMPLE_TRACKS } from '../data/sampleTracks';
+/** Import local audio into the library. */
+const ImportPage: React.FC = () => (
+  <div className='page import-page no-select'>
+    <header className='page-head'>
+      <div>
+        <h1 className='page-title'>Add music</h1>
+        <p className='page-sub'>Bring in the songs already saved on this device.</p>
+      </div>
+      <Link to='/library' className='btn btn-ghost'>
+        <span className='material-symbols-outlined' aria-hidden='true'>
+          library_music
+        </span>
+        Back to library
+      </Link>
+    </header>
 
-// hooks
-import useLibrary from '../hooks/useLibrary';
+    <div className='import-layout'>
+      <div className='import-main'>
+        <ImportPanel />
+      </div>
 
-/**
- * Metadata ingestion page: extract tags locally, POST them in one batch, and see the
- * fingerprint dedupe by importing the same batch twice.
- */
-const ImportPage: React.FC = () => {
-  const { importTracks, importing, lastImport, error } = useLibrary();
-  const [sampleError, setSampleError] = useState<string | null>(null);
-
-  const syncSample = async (): Promise<void> => {
-    setSampleError(null);
-
-    const result = await importTracks(SAMPLE_TRACKS);
-
-    if (!result) {
-      setSampleError('The demo batch was rejected - check the banner above for the backend message.');
-    }
-  };
-
-  return (
-    <div className='albums flex flex-column flex-gap no-select'>
-      <div className='container flex flex-column flex-gap'>
-        <section className='flex flex-column flex-gap'>
-          <div className='flex flex-space-between flex-v-center'>
-            <h3>Sync local track metadata</h3>
-            <Link to='/library' className='button black'>
-              Back to library
-            </Link>
-          </div>
-
-          <p className='muted'>
-            Batches of up to 500 items go to <code>POST /api/catalog/tracks/batch</code>. The server
-            fingerprints <em>title + artist + duration</em>, links only what is new for your account
-            and publishes one <code>SongImportedEvent</code> per track through the transactional
-            outbox.
-          </p>
-
-          <p className='muted'>
-            Enrichment uses your own AI provider and API key.{' '}
-            <Link to='/settings' className='underline'>
-              Configure the AI provider
-            </Link>{' '}
-            before syncing if you want mood, themes and energy extracted.
-          </p>
-
-          {error && <p className='banner banner-error'>{error}</p>}
-          {sampleError && <p className='banner banner-error'>{sampleError}</p>}
-
-          <ImportPanel />
-
-          <div className='flex flex-gap flex-v-center'>
-            <button
-              type='button'
-              className='button black'
-              disabled={importing}
-              onClick={() => void syncSample()}
-            >
-              {importing ? 'Importing...' : `Load demo batch (${SAMPLE_TRACKS.length} tracks)`}
-            </button>
-            <span className='chip'>
-              {lastImport
-                ? `last import: ${lastImport.imported} new / ${lastImport.duplicates} duplicates`
-                : 'no import yet'}
-            </span>
-          </div>
-
-          <p className='muted small'>
-            Run the import twice to watch dedupe: the second call reports every item as a duplicate
-            and the library count stays the same.
+      <aside className='import-aside'>
+        <section className='aside-card'>
+          <h3>Your files stay here</h3>
+          <p>
+            Lyra reads the tags in your browser. The audio never leaves this device; only the track
+            details are saved to your library.
           </p>
         </section>
-      </div>
+
+        <section className='aside-card'>
+          <h3>Supported files</h3>
+          <ul className='aside-list'>
+            {['MP3', 'M4A', 'FLAC', 'OGG', 'WAV'].map((format) => (
+              <li key={format}>
+                <span className='material-symbols-outlined' aria-hidden='true'>
+                  check_circle
+                </span>
+                {format}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className='aside-card'>
+          <h3>Good tags, better matches</h3>
+          <p>
+            Title, artist and album help Lyra find the right lyrics and artwork. Files without tags
+            still import using their file name.
+          </p>
+        </section>
+      </aside>
     </div>
-  );
-};
+  </div>
+);
 
 export default ImportPage;

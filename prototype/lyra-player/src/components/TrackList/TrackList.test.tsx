@@ -43,22 +43,19 @@ describe('TrackList', () => {
     expect(screen.getAllByText('05:55')).toHaveLength(2);
   });
 
-  it('marks metadata-only rows and offers to attach the local file', () => {
+  it('offers to link a file for rows without local audio', () => {
     renderWithProviders(<TrackList tracks={[track()]} onAttach={vi.fn()} />);
 
-    expect(screen.getByText('metadata only')).toBeInTheDocument();
-    expect(screen.getByText('awaiting enrichment')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Attach file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link file' })).toBeInTheDocument();
   });
 
-  it('marks rows whose audio is already on this device', () => {
+  it('hides the link action when audio is already on this device', () => {
     renderWithProviders(
-      <TrackList tracks={[track({ mediaurl: 'blob:local-1', isEnriched: true })]} onAttach={vi.fn()} />,
+      <TrackList tracks={[track({ mediaurl: 'blob:local-1', hasLyrics: true })]} onAttach={vi.fn()} />,
     );
 
-    expect(screen.getByText('on device')).toBeInTheDocument();
-    expect(screen.getByText('enriched')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Attach file' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Link file' })).not.toBeInTheDocument();
+    expect(screen.getByTitle('Lyrics available')).toBeInTheDocument();
   });
 
   it('calls onAttach with the clicked track', async () => {
@@ -67,7 +64,7 @@ describe('TrackList', () => {
 
     renderWithProviders(<TrackList tracks={[first]} onAttach={onAttach} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Attach file' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link file' }));
 
     expect(onAttach).toHaveBeenCalledWith(first);
   });

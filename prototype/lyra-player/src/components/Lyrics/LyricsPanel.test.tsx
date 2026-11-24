@@ -80,7 +80,7 @@ describe('LyricsPanel', () => {
     expect(await screen.findByText('first synced line')).toBeInTheDocument();
     expect(screen.getByText('second synced line')).toBeInTheDocument();
     expect(screen.queryByText('plain version')).not.toBeInTheDocument();
-    expect(screen.getByText('Synced lyrics - tap a line to jump.')).toBeInTheDocument();
+    expect(screen.getByText('Tap a line to jump to it.')).toBeInTheDocument();
   });
 
   it('falls back to plain lyrics when no synced version exists', async () => {
@@ -93,6 +93,6 @@ describe('LyricsPanel', () => {
 
     expect(await screen.findByText('plain line one')).toBeInTheDocument();
     expect(screen.getByText('plain line two')).toBeInTheDocument();
-    expect(screen.queryByText('Synced lyrics - tap a line to jump.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tap a line to jump to it.')).not.toBeInTheDocument();
   });
 });

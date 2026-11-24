@@ -1,4 +1,3 @@
-// interfaces
 interface IProps {
   page: number;
   totalPages: number;
@@ -8,7 +7,7 @@ interface IProps {
   onChange: (page: number) => void;
 }
 
-/** Pager for the backend-paged library endpoint (page / pageSize query params). */
+/** Page controls for the library. */
 const Paging: React.FC<IProps> = ({ page, totalPages, totalCount, pageSize, loading = false, onChange }) => {
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(totalCount, page * pageSize);
@@ -18,25 +17,25 @@ const Paging: React.FC<IProps> = ({ page, totalPages, totalCount, pageSize, load
   }
 
   return (
-    <div className='pager flex flex-gap flex-v-center flex-space-between'>
-      <span className='chip'>
-        {from}-{to} of {totalCount}
+    <div className='pager'>
+      <span className='pager-info'>
+        {from}–{to} of {totalCount}
       </span>
-      <div className='flex flex-gap-small flex-v-center'>
+      <div className='pager-actions'>
         <button
           type='button'
-          className='button black'
+          className='btn btn-ghost btn-sm'
           disabled={loading || page <= 1}
           onClick={() => onChange(page - 1)}
         >
           Previous
         </button>
-        <span className='chip'>
-          page {page} / {totalPages}
+        <span className='pager-page'>
+          Page {page} of {totalPages}
         </span>
         <button
           type='button'
-          className='button black'
+          className='btn btn-ghost btn-sm'
           disabled={loading || page >= totalPages}
           onClick={() => onChange(page + 1)}
         >

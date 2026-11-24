@@ -16,3 +16,6 @@ http-client.private.env.json
 # IDE data sources can embed credentials in JDBC URLs.
 .idea/**/dataSources.xml
 .idea/**/dataSources.local.xml
+
+# Local browser-audit artifacts
+.playwright-cli/

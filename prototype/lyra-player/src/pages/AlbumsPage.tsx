@@ -2,23 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Link } from 'react-router-dom';
 
-// components
 import Banner from '../components/Feedback/Banner';
 import Card from '../components/Album/Card';
-import Search from '../components/Search/Search';
 
-// hooks
 import useLibrary from '../hooks/useLibrary';
 
-// utils
 import { describeError } from '../api/errors';
 
 import type { IAlbumGroup } from '../types/types';
 
-/**
- * Album grid grouped from catalog metadata. Loads one page at the backend maximum of 200
- * tracks so grouping covers a large library without extra round-trips.
- */
+/** Album grid grouped from the tracks in the library. */
 const AlbumsPage: React.FC = () => {
   const { albums, loadAlbums } = useLibrary();
 
@@ -39,33 +32,42 @@ const AlbumsPage: React.FC = () => {
   }, [loadAlbums]);
 
   return (
-    <div className='albums flex flex-column flex-gap no-select'>
-      <div className='container flex flex-column flex-gap'>
-        <Search />
+    <div className='page albums-page no-select'>
+      <header className='page-head'>
+        <div>
+          <h1 className='page-title'>Albums</h1>
+          <p className='page-sub'>Every record already in your collection.</p>
+        </div>
+        <Link to='/library' className='btn btn-ghost'>
+          <span className='material-symbols-outlined' aria-hidden='true'>
+            queue_music
+          </span>
+          All tracks
+        </Link>
+      </header>
 
-        <section className='flex flex-column flex-gap'>
-          <div className='flex flex-space-between flex-v-center'>
-            <h3>Albums in your library</h3>
-            <Link to='/library' className='button black'>
-              All tracks
+      <Banner message={error} />
+
+      {groups.length === 0 ? (
+        <div className='empty-state'>
+          <span className='material-symbols-outlined' aria-hidden='true'>
+            album
+          </span>
+          <h2>No albums yet</h2>
+          <p>Add music with album tags and your records will appear here automatically.</p>
+          <div className='empty-state-actions'>
+            <Link to='/import' className='btn btn-primary'>
+              Add music
             </Link>
           </div>
-
-          <Banner message={error} />
-
-          {groups.length === 0 ? (
-            <p className='empty'>
-              Nothing grouped yet - albums appear after you sync metadata from local files.
-            </p>
-          ) : (
-            <div className='grid flex-gap'>
-              {groups.map((album) => (
-                <Card key={album.id} album={album} />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+        </div>
+      ) : (
+        <div className='album-grid'>
+          {groups.map((album) => (
+            <Card key={album.id} album={album} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

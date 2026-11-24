@@ -10,6 +10,7 @@ import TrackProvider from './providers/TrackProvider';
 // styles
 import './styles/player.css';
 import './styles/lyra.css';
+import './styles/app.css';
 
 const App: React.FC = () => (
   <ApiProvider>

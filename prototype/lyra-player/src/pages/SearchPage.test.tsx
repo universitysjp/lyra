@@ -12,7 +12,7 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search?q=bohemain%20rhapsody', backend, session });
 
-    expect(await screen.findByText(/Closest matches for "bohemain rhapsody"/)).toBeInTheDocument();
+    expect(await screen.findByText('Bohemian Rhapsody')).toBeInTheDocument();
     await waitFor(
       () =>
         expect(
@@ -31,7 +31,7 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search?q=zzzzzz', backend, session });
 
-    expect(await screen.findByText('No close matches in your library.')).toBeInTheDocument();
+    expect(await screen.findByText('No matches for “zzzzzz”')).toBeInTheDocument();
   });
 
   it('prompts for a term when the query is empty and calls nothing', async () => {
@@ -40,9 +40,7 @@ describe('SearchPage', () => {
 
     renderApp({ route: '/search', backend, session });
 
-    expect(
-      await screen.findByText(/Type something above to search the tracks you synced/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('What do you want to hear?')).toBeInTheDocument();
     expect(
       backend.requests.filter((entry) => entry.startsWith('GET /api/catalog/tracks/search')),
     ).toHaveLength(0);
