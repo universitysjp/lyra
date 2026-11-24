@@ -12,8 +12,14 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-// Load local secrets (connection strings, credentials) from the repository-root .env file.
-Env.Load(options: new LoadOptions().TraversePath());
+// Load local secrets (connection strings, credentials) from the repository-root .env file
+// in local development only; production reads injected environment variables only.
+var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+if (string.IsNullOrEmpty(environmentName)
+    || environmentName.Equals("Development", StringComparison.OrdinalIgnoreCase))
+{
+    Env.Load(options: new LoadOptions().TraversePath());
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +42,13 @@ var connectionString =
 if (!builder.Environment.IsDevelopment()
     && !builder.Environment.IsEnvironment("Testing"))
 {
+    if (string.IsNullOrWhiteSpace(builder.Configuration[$"{InternalServicesOptions.SectionName}:ApiKey"]))
+    {
+        throw new InvalidOperationException(
+            "The internal service API key is missing. Set 'InternalServices__ApiKey' in the " +
+            "deployed environment (see .env.example for the expected value shape).");
+    }
+
     var grpcUrl = builder.Configuration["Kestrel:Endpoints:Grpc:Url"];
     if (!Uri.TryCreate(grpcUrl, UriKind.Absolute, out var grpcUri)
         || grpcUri.Scheme != Uri.UriSchemeHttps)

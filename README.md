@@ -115,7 +115,7 @@ dotnet restore Lyra.slnx
 cp .env.example .env   # then edit .env with your local credentials
 ```
 
-All usernames, passwords, and connection strings live in the repository-root `.env` file, which is **gitignored** (never commit it). `.env.example` is the committed template documenting every variable. Docker Compose reads `.env` automatically, and `Lyra.Identity.Api` / `Lyra.Catalog.Api` load it at startup via [DotNetEnv](https://www.nuget.org/packages/DotNetEnv), mapping `Section__Key` variables (e.g. `ConnectionStrings__IdentityDb`, `RabbitMq__Password`) onto standard .NET configuration. No credentials are stored in `appsettings*.json`.
+All usernames, passwords, and connection strings live in the repository-root `.env` file, which is **gitignored** (never commit it). `.env.example` is the committed template documenting every variable. Docker Compose reads `.env` automatically, and in local development `Lyra.Identity.Api`, `Lyra.Catalog.Api`, and `Lyra.Enrichment.Worker` load it via [DotNetEnv](https://www.nuget.org/packages/DotNetEnv), mapping `Section__Key` variables (e.g. `ConnectionStrings__IdentityDb`, `RabbitMq__Password`) onto standard .NET configuration. Outside Development the services read injected environment variables only and never look for a `.env` file. No credentials are stored in `appsettings*.json`.
 
 ### Run Infrastructure Dependencies
 

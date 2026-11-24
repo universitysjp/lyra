@@ -13,8 +13,16 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using IdentityGrpcClient = Lyra.Contracts.Grpc.Identity.UserAiConnectionService.UserAiConnectionServiceClient;
 
-// Load local secrets (connection strings, broker credentials) from the repository-root .env file.
-Env.Load(options: new LoadOptions().TraversePath());
+// Load local secrets (connection strings, broker credentials) from the repository-root .env
+// file in local development only; production reads injected environment variables only.
+var environmentName =
+    Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+    ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+if (string.IsNullOrEmpty(environmentName)
+    || environmentName.Equals("Development", StringComparison.OrdinalIgnoreCase))
+{
+    Env.Load(options: new LoadOptions().TraversePath());
+}
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -66,11 +74,13 @@ if (rabbitMq.Port is < 1 or > 65535)
     throw new InvalidOperationException("RabbitMq:Port must be between 1 and 65535.");
 }
 
-if (string.IsNullOrWhiteSpace(internalServices.ApiKey))
+if (!builder.Environment.IsDevelopment()
+    && !builder.Environment.IsEnvironment("Testing")
+    && string.IsNullOrWhiteSpace(internalServices.ApiKey))
 {
     throw new InvalidOperationException(
         "The internal gRPC credential is missing. Set 'InternalServices__ApiKey' " +
-        "in the repository-root .env file (see .env.example).");
+        "in the deployed environment (see .env.example for the expected value shape).");
 }
 
 if (!Uri.TryCreate(identityOptions.GrpcAddress, UriKind.Absolute, out var identityGrpcUri))
