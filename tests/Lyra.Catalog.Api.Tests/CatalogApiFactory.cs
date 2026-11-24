@@ -18,6 +18,11 @@ public sealed class CatalogApiFactory(string connectionString) : WebApplicationF
         builder.UseEnvironment("Testing");
         builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
 
+        // The factory owns the database and cache; the app must not need a local .env file.
+        // UseSetting lands on the host configuration before Program reads the connection strings.
+        builder.UseSetting("ConnectionStrings:CatalogDb", connectionString);
+        builder.UseSetting("ConnectionStrings:Redis", "localhost:6379");
+
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<CatalogDbContext>>();
