@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Lyra Contributors
+Copyright (c) 2026 Nuwan Konara, Raviru Rathnaweera, Pruthivi Thejan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

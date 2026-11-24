@@ -220,4 +220,4 @@ Every push to `main` and every pull request runs [`.github/workflows/ci.yml`](.g
 
 ## License
 
-See [`LICENSE`](LICENSE).
+See [`LICENSE.md`](LICENSE.md).
