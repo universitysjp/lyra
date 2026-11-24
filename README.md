@@ -207,10 +207,14 @@ When a track is playing, the player exposes a lyrics button. Synced LRC lines hi
 
 Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
+Every push to `main` and every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml): the backend is restored, built with warnings as errors, and tested (the PostgreSQL integration tests use Testcontainers), and the React client is typechecked, tested, and built.
+
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md) — conventions and guardrails for AI coding agents working in this repository.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — detailed service/event architecture.
+- [`docs/decisions/`](docs/decisions/README.md) — architecture decision records (why the boundaries are where they are).
+- [`docs/plans/`](docs/plans/README.md) — historical implementation plans kept for provenance.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow and coding standards.
 - [`CHANGELOG.md`](CHANGELOG.md) — notable changes across versions.
 
