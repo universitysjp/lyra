@@ -2,7 +2,7 @@ namespace Lyra.Enrichment.Worker.Services.Enrichment;
 
 using Lyra.Contracts.Events;
 using Lyra.Enrichment.Worker.Models;
-using Lyra.Enrichment.Worker.Services.AiConnections;
+using Lyra.AI.Identity;
 using Lyra.Enrichment.Worker.Services.Caching;
 using Lyra.Enrichment.Worker.Services.Lyrics;
 using Microsoft.Extensions.Logging;

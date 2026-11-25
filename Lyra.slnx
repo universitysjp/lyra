@@ -10,4 +10,5 @@
   <Project Path="tests/Lyra.Catalog.Api.Tests/Lyra.Catalog.Api.Tests.csproj" />
   <Project Path="tests/Lyra.Enrichment.Worker.Tests/Lyra.Enrichment.Worker.Tests.csproj" />
   <Project Path="tests/Lyra.Identity.Api.Tests/Lyra.Identity.Api.Tests.csproj" />
+  <Project Path="tests/Lyra.PlaylistRag.Api.Tests/Lyra.PlaylistRag.Api.Tests.csproj" />
 </Solution>

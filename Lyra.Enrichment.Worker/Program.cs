@@ -4,7 +4,7 @@ using Lyra.AI;
 using Lyra.AI.Configuration;
 using Lyra.Enrichment.Worker.Configuration;
 using Lyra.Enrichment.Worker.Consumers;
-using Lyra.Enrichment.Worker.Services.AiConnections;
+using Lyra.AI.Identity;
 using Lyra.Enrichment.Worker.Services.Caching;
 using Lyra.Enrichment.Worker.Services.Enrichment;
 using Lyra.Enrichment.Worker.Services.Lyrics;

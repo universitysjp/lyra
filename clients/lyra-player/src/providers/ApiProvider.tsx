@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { createAiConnectionsApi } from '../api/aiConnections';
 import { createAuthApi } from '../api/auth';
 import { createCatalogApi } from '../api/catalog';
+import { createPlaylistsApi } from '../api/playlists';
 import { createLyraClient } from '../api/http';
 import { createMemorySessionStore, createSessionStore } from '../api/session';
 import ApiContext from '../contexts/ApiContext';
@@ -46,6 +47,7 @@ const ApiProvider: React.FC<IProps> = ({ children, value, session, fetchImpl, on
       auth: createAuthApi(client),
       catalog: createCatalogApi(client),
       aiConnections: createAiConnectionsApi(client),
+      playlists: createPlaylistsApi(client),
     };
     // The provider is mounted once per app; prop changes intentionally create a new client.
   }, [session, fetchImpl]);

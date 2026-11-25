@@ -1,7 +1,7 @@
 namespace Lyra.Enrichment.Worker.Tests.TestDoubles;
 
 using Lyra.Contracts.AI;
-using Lyra.Enrichment.Worker.Services.AiConnections;
+using Lyra.AI.Identity;
 
 internal sealed class FakeUserAiConnectionClient : IUserAiConnectionClient
 {

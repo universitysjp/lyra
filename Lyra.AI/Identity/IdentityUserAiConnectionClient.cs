@@ -1,8 +1,7 @@
-namespace Lyra.Enrichment.Worker.Services.AiConnections;
+namespace Lyra.AI.Identity;
 
 using global::Grpc.Core;
 using Lyra.Contracts.AI;
-using Lyra.Enrichment.Worker.Configuration;
 using Microsoft.Extensions.Options;
 using GrpcAiProvider = Lyra.Contracts.Grpc.Identity.AiProvider;
 using GrpcOpenCodePlan = Lyra.Contracts.Grpc.Identity.OpenCodePlan;

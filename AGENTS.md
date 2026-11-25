@@ -17,7 +17,7 @@ If a document and the code disagree, **the code is the fact and the document is 
 Lyra is a backend microservices platform for an AI-powered local music mobile application.
 
 - **Core Concept:** Audio files stay locally on the user's mobile device (Flutter client). The mobile app extracts ID3 metadata from local tracks and syncs it in batches to the backend.
-- **Pipeline:** Incoming track metadata is stored for fast retrieval, then asynchronously enriched via RabbitMQ: fetching lyrics from LRCLIB, categorizing mood/themes/energy via an LLM. Vector embeddings in PostgreSQL (`pgvector`) and a RAG endpoint that generates playlists from the user's own catalog are **planned, not implemented** (see ADR-0003).
+- **Pipeline:** Incoming track metadata is stored for fast retrieval, then asynchronously enriched via RabbitMQ: fetching lyrics from LRCLIB, categorizing mood/themes/energy via an LLM. `Lyra.PlaylistRag.Api` embeds the enriched catalog into PostgreSQL (`pgvector`) and serves a RAG endpoint that generates and sequences playlists from the user's own catalog.
 
 ## 2. Solution & Microservices Architecture (Database-per-Service)
 
@@ -38,10 +38,10 @@ Lyra is a backend microservices platform for an AI-powered local music mobile ap
    - Step 2: Publish `SongLyricsFetchedEvent` immediately when lyrics are found, before resolving the user's AI connection, so AI failures cannot lose them; include the selected LRCLIB record's canonical metadata.
    - Step 3: Use `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10).
    - Step 4: Publish `SongEnrichedEvent` containing both lyric forms, resolved metadata, extracted tags, and a combined semantic summary string.
-6. **`Lyra.PlaylistRag.Api`** (ASP.NET Core Web API) — **planned, currently a stub** (JWT wiring + authenticated `/ping`; see ADR-0003):
-   - Will consume `SongEnrichedEvent`, generate vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`), and upsert them into PostgreSQL with `pgvector` (`HNSW` cosine distance index).
-   - Will expose `POST /api/playlists/generate`: rewrites user prompt into metadata filters + semantic search query, executes `pgvector` similarity search strictly scoped to `UserId`, and uses an LLM to select/sequence the top tracks into a cohesive playlist returning the user's `LocalTrackId`s.
-   - Database: `vector_db` (PostgreSQL + `pgvector`) — provisioned, unused until the service is implemented.
+6. **`Lyra.PlaylistRag.Api`** (ASP.NET Core Web API):
+   - Consumes `SongImportedEvent` to maintain the per-user `(UserId, TrackId) → LocalTrackId` ownership map, and `SongEnrichedEvent` to embed each global track once with the deployment-wide OpenCode Go `text-embedding-3-small` model (1536 dimensions), upserting into PostgreSQL `pgvector` with an `HNSW` cosine distance index.
+   - Exposes `POST /api/playlists/generate`: resolves the caller's encrypted AI connection over Identity's private gRPC service, rewrites the prompt into a validated query plan, embeds the semantic query, runs a `pgvector` cosine search joined through `user_tracks` (strict `UserId` scope) with hard energy/artist/title filters and soft mood/theme ranking, then uses the user's chat model to select and sequence candidates. Returns only the caller's `LocalTrackId`s; invalid selection output fails (`502`) instead of falling back.
+   - Database: `vector_db` (PostgreSQL + `pgvector`).
 
 ## 3. Infrastructure & Approved Stack
 

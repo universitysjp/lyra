@@ -1,6 +1,6 @@
 # Lyra
 
-**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging). A Retrieval-Augmented Generation (RAG) endpoint for generating custom playlists from the user's own catalog is **planned**; it does not exist yet (ADR-0003).
+**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging). `Lyra.PlaylistRag.Api` turns that enriched catalog into vector embeddings and generates custom playlists from the user's own tracks through Retrieval-Augmented Generation (RAG).
 
 ## Table of Contents
 
@@ -22,8 +22,8 @@
    - Fetch plain and synced lyrics from [LRCLIB](https://lrclib.net/). Metadata is normalized for the query only (file extensions and filename noise such as `(mp3.pm)` are stripped), then an exact lookup is attempted. If LRCLIB returns `404`, the v2 search endpoint supplies candidate metadata which is scored title-first (55% title, 30% duration, 15% artist) before the best qualifying candidate is fetched.
    - Store whatever lyrics were found **before** resolving the AI provider, so a missing/broken AI connection never loses successful lyrics.
    - Categorize mood, themes, and energy level via an LLM using `Microsoft.Extensions.AI` and the caller's encrypted, per-user AI provider connection.
-4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries). Consumption by `Lyra.PlaylistRag.Api` (generating vector embeddings into PostgreSQL `pgvector`) is **planned, not active** — that project is currently a stub (ADR-0003).
-5. **Planned:** users will prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog. The endpoint does not exist yet; `Lyra.PlaylistRag.Api` today only wires authentication and serves `/ping`.
+4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries) and by `Lyra.PlaylistRag.Api` (upserts vector embeddings into PostgreSQL `pgvector`). `Lyra.PlaylistRag.Api` also consumes `SongImportedEvent` to keep a per-user `(UserId, TrackId) → LocalTrackId` ownership map.
+5. Users prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog. The service resolves the caller's encrypted AI connection, rewrites the prompt into filters plus a semantic query, searches `vector_db` scoped to the caller, and returns the caller's `LocalTrackId`s. The React client exposes the flow under **Create playlist**.
 
 ## Architecture
 
@@ -35,8 +35,8 @@ Lyra follows a **database-per-service** microservices architecture with asynchro
                          └─────────┬─────────┘
                  ┌─────────────────┼─────────────────────┐
                  ▼                 ▼                      ▼
-       Lyra.Identity.Api   Lyra.Catalog.Api      Lyra.PlaylistRag.Api (planned)
-        (identity_db)        (catalog_db)         (vector_db, planned)
+       Lyra.Identity.Api   Lyra.Catalog.Api      Lyra.PlaylistRag.Api
+        (identity_db)        (catalog_db)         (vector_db)
                                    │   ▲                    ▲
                         SongImportedEvent │          SongEnrichedEvent
                                    ▼   │                    │
@@ -47,7 +47,7 @@ Lyra follows a **database-per-service** microservices architecture with asynchro
                Redis                    ◀──── catalog cache-aside
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of each service, its responsibilities, and data contracts. `Lyra.PlaylistRag.Api` and its `vector_db` appear in the diagram for context only: both are planned (ADR-0003).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of each service, its responsibilities, and data contracts.
 
 ## Services
 
@@ -58,7 +58,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of e
 | `Lyra.Identity.Api` | ASP.NET Core Web API | Registration, login, JWT issuance, encrypted per-user AI provider connections, private gRPC lookup | `identity_db` |
 | `Lyra.Catalog.Api` | ASP.NET Core Web API | Batch track ingestion, dedup, fuzzy search, Redis cache-aside, enrichment state | `catalog_db` |
 | `Lyra.Enrichment.Worker` | Background Worker Service | Lyrics fetch (LRCLIB exact + fuzzy fallback) + LLM mood/theme/energy extraction | — |
-| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Stub only — JWT wiring and `/ping`. Embedding generation, `pgvector` search, and playlist generation are planned (ADR-0003). | `vector_db` (planned) |
+| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Event ingestion into `vector_db`, deployment-wide embeddings, user-scoped `pgvector` search, and `POST /api/playlists/generate` | `vector_db` |
 
 ## Technology Stack
 
@@ -79,13 +79,14 @@ Lyra.Identity.Api/
 Lyra.Catalog.Api/
 Lyra.AI/                 # Shared Microsoft.Extensions.AI provider adapter
 Lyra.Enrichment.Worker/
-Lyra.PlaylistRag.Api/     # (planned) stub: JWT wiring + /ping only, see ADR-0003
+Lyra.PlaylistRag.Api/     # RAG event ingestion, embeddings, and playlist generation
 clients/lyra-player/      # React/Vite reference client used to exercise the backend
 tests/
   Lyra.Identity.Api.Tests/
   Lyra.Catalog.Api.Tests/
   Lyra.AI.Tests/
   Lyra.Enrichment.Worker.Tests/
+  Lyra.PlaylistRag.Api.Tests/
 docs/
   ARCHITECTURE.md
 docker-compose.yml
@@ -96,7 +97,7 @@ CONTRIBUTING.md
 CHANGELOG.md
 ```
 
-> **Note:** Lyra is in early scaffolding. Projects are added incrementally to `Lyra.slnx`; see [`CHANGELOG.md`](CHANGELOG.md) for current progress. `Lyra.PlaylistRag.Api` is present but is only a stub (JWT wiring and `/ping`); RAG playlist generation is planned, per [ADR-0003](docs/decisions/ADR-0003-playlist-rag-remains-planned.md).
+> **Note:** Lyra is in early scaffolding. Projects are added incrementally to `Lyra.slnx`; see [`CHANGELOG.md`](CHANGELOG.md) for current progress.
 
 ## Getting Started
 
@@ -165,13 +166,28 @@ Supported providers are `OpenAI`, `Gemini`, `OpenCode`, and `Anthropic`. The Rea
 
 For `OpenCode`, choose a model that is eligible for external clients on the selected plan. OpenCode free-tier chat models are not available to external clients such as Lyra, so a free model name fails enrichment even though the connection saves successfully.
 
+### RAG Embeddings
+
+Playlist generation uses a **deployment-wide embedding model**, separate from each user's chat connection:
+
+```env
+Rag__Provider=OpenCode
+Rag__OpenCodePlan=Go
+Rag__Model=text-embedding-3-small
+Rag__Dimensions=1536
+Rag__ApiKey=<your OpenCode Go key>
+```
+
+`text-embedding-3-small` produces 1536-dimensional vectors, matching the `vector(1536)` column and HNSW index in `vector_db`. The embedding key is used only by `Lyra.PlaylistRag.Api`; user BYOK connections remain for prompt rewriting and playlist selection. The service fails fast if the provider, model, dimensions, or key are invalid.
+
 ### Run the Enrichment Pipeline
 
-Run Identity, Catalog, and the Worker together (RabbitMQ, PostgreSQL, and Redis must be up):
+Run Identity, Catalog, PlaylistRag, and the Worker together (RabbitMQ, PostgreSQL, and Redis must be up):
 
 ```bash
-dotnet run --project Lyra.Identity.Api   # REST :5001, internal gRPC :5004
-dotnet run --project Lyra.Catalog.Api    # REST :5002
+dotnet run --project Lyra.Identity.Api     # REST :5001, internal gRPC :5004
+dotnet run --project Lyra.Catalog.Api      # REST :5002
+dotnet run --project Lyra.PlaylistRag.Api  # REST :5003
 dotnet run --project Lyra.Enrichment.Worker
 ```
 
@@ -217,6 +233,12 @@ Set `VITE_BACKEND_URL` in a local `.env.local` file to point the dev proxy at a 
 The React reference client stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
 
 When a track is playing, the player exposes a lyrics button. Synced LRC lines highlight and auto-scroll with playback and can be clicked to seek; plain lyrics are rendered as static text. The panel fetches only the current track's lyrics from the dedicated endpoint.
+
+### Generate a Playlist in the React Client
+
+Open **Create playlist** (`/playlists`) after at least one track has been enriched. Enter a mood, activity, or kind of sound, choose a track count, and select **Build playlist**. The client calls `POST /api/playlists/generate` through the Gateway and renders the returned title, description, reasons, and tracks. Playback uses the caller's own local files, just like library playback.
+
+Generation is intentionally strict: a missing AI provider returns `409`, an unindexed library returns `409`, and invalid model output returns `502` rather than a fallback playlist. Prompt rewrites and track selection use the signed-in user's BYOK chat connection; query embeddings use the deployment-wide `Rag__ApiKey`.
 
 ## Contributing
 

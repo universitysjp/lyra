@@ -1,6 +1,6 @@
 # ADR-0003: `Lyra.PlaylistRag.Api` stays planned until it is implemented
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0004
 - **Date:** 2026-11-24
 - **Deciders:** owner (repository maintainer) — confirmation needed
 

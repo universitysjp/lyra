@@ -1,4 +1,4 @@
-namespace Lyra.Enrichment.Worker.Services.AiConnections;
+namespace Lyra.AI.Identity;
 
 using Lyra.Contracts.AI;
 

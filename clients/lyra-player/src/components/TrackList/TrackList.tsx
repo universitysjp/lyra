@@ -9,6 +9,7 @@ interface IProps {
   tracks: ITrack[];
   onAttach: (track: ITrack) => void;
   albumFor?: (track: ITrack) => string;
+  reasonFor?: (track: ITrack) => string | null;
   emptyLabel?: string;
   showAlbum?: boolean;
 }
@@ -18,6 +19,7 @@ const TrackList: React.FC<IProps> = ({
   tracks,
   onAttach,
   albumFor,
+  reasonFor,
   emptyLabel = 'Nothing here yet.',
   showAlbum = true,
 }) => {
@@ -40,6 +42,7 @@ const TrackList: React.FC<IProps> = ({
       {tracks.map((track) => {
         const selected = currentTrack?.id === track.id;
         const playing = selected && currentState === 'playing';
+        const reason = reasonFor?.(track);
 
         return (
           <div
@@ -79,6 +82,7 @@ const TrackList: React.FC<IProps> = ({
                 {track.name}
               </button>
               <span className='track-artist'>{track.artist}</span>
+              {reason && <span className='track-reason'>{reason}</span>}
               {!track.mediaurl && (
                 <button
                   type='button'

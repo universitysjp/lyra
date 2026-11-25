@@ -14,6 +14,7 @@ import AlbumsPage from '../pages/AlbumsPage';
 import LoginPage from '../pages/LoginPage';
 import ImportPage from '../pages/ImportPage';
 import LibraryPage from '../pages/LibraryPage';
+import PlaylistPage from '../pages/PlaylistPage';
 import SearchPage from '../pages/SearchPage';
 import SettingsPage from '../pages/SettingsPage';
 
@@ -51,6 +52,7 @@ const Navigation: React.FC = () => (
       <Route path='/library' element={<LibraryPage />} />
       <Route path='/albums' element={<AlbumsPage />} />
       <Route path='/album/:id' element={<AlbumPage />} />
+      <Route path='/playlists' element={<PlaylistPage />} />
       <Route path='/search' element={<SearchPage />} />
       <Route path='/import' element={<ImportPage />} />
       <Route path='/settings' element={<SettingsPage />} />

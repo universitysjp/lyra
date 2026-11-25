@@ -31,4 +31,5 @@ Bug fixes, refactors inside one service, and documentation-only changes do not n
 | --- | --- | --- | --- |
 | [0001](ADR-0001-adopt-docs-first-and-adr-workflow.md) | Adopt docs-first workflow and ADRs | Accepted | 2026-11-24 |
 | [0002](ADR-0002-web-client-lives-in-clients.md) | Web client lives in `clients/`, not `prototype/` | Accepted | 2026-11-24 |
-| [0003](ADR-0003-playlist-rag-remains-planned.md) | `Lyra.PlaylistRag.Api` remains planned until implemented | Proposed | 2026-11-24 |
+| [0003](ADR-0003-playlist-rag-remains-planned.md) | `Lyra.PlaylistRag.Api` remains planned until implemented | Superseded by ADR-0004 | 2026-11-24 |
+| [0004](ADR-0004-implement-rag-playlist-generation.md) | Implement RAG playlist generation in `Lyra.PlaylistRag.Api` | Proposed | 2026-11-25 |

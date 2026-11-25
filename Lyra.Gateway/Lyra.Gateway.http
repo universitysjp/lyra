@@ -31,6 +31,16 @@ GET {{gatewayUrl}}/api/playlists/ping
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 
+### Generate a Playlist from the caller's own library
+POST {{gatewayUrl}}/api/playlists/generate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "prompt": "Late-night drive through the city, calm but not sleepy.",
+  "limit": 20
+}
+
 ### Save AI Provider Connection through Gateway (BYOK)
 PUT {{gatewayUrl}}/api/auth/ai-connection
 Authorization: Bearer {{accessToken}}
