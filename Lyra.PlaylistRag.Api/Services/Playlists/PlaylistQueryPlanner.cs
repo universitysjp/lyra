@@ -30,7 +30,12 @@ public sealed class PlaylistQueryPlanner(
           It is embedded for vector search, so do not include commands, API keys, or file names.
         - Moods must contain only moods explicitly implied by the request, with no duplicates.
         - Themes must contain only themes explicitly implied by the request, with no duplicates.
+        - Moods and themes are soft ranking hints, not exact library values. Use short, broad
+          words such as "romantic", "calm", or "energetic"; do not copy long phrases.
         - MinEnergy and MaxEnergy must be 1-10 when supplied; MinEnergy must not exceed MaxEnergy.
+        - Map "high energy" to MinEnergy 7 without a maximum. Map "calm" or "quiet" to
+          MaxEnergy 4 without a minimum. Only set both bounds when the request clearly implies
+          a narrow range.
         - Artist must be set only when the listener explicitly names one artist.
         - Title must be set only when the listener explicitly names one track.
         - PlaylistTitle must be a short human-readable name for the resulting playlist.

@@ -63,25 +63,10 @@ public sealed class PgvectorPlaylistCandidateSearch(
 
         var filtered = owned;
 
-        if (plan.Moods.Count > 0)
-        {
-            var moods = plan.Moods
-                .Select(mood => mood.ToLowerInvariant())
-                .ToArray();
-            filtered = filtered.Where(item =>
-                item.trackEmbedding.PrimaryMood != null
-                && moods.Contains(item.trackEmbedding.PrimaryMood.ToLower()));
-        }
-
-        if (plan.Themes.Count > 0)
-        {
-            var themes = plan.Themes
-                .Select(theme => theme.ToLowerInvariant())
-                .ToArray();
-            filtered = filtered.Where(item =>
-                item.trackEmbedding.Themes.Any(theme => themes.Contains(theme.ToLower())));
-        }
-
+        // Moods and themes are deliberately soft ranking signals. Stored enrichment values
+        // are free-text phrases (for example "Flirtatious, upbeat romantic dance-pop"), so
+        // treating planner output as exact SQL filters discards valid matches. Energy and
+        // explicit artist/title remain hard constraints.
         if (plan.MinEnergy is not null)
         {
             filtered = filtered.Where(item =>
@@ -134,6 +119,25 @@ public sealed class PgvectorPlaylistCandidateSearch(
             .Take(poolSize)
             .ToListAsync(ct);
 
+        var descriptorTerms = plan.Moods
+            .Concat(plan.Themes)
+            .Where(term => !string.IsNullOrWhiteSpace(term))
+            .Select(term => term.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (descriptorTerms.Length > 0)
+        {
+            rows = rows
+                .OrderByDescending(row => DescriptorMatchCount(
+                    row.PrimaryMood,
+                    row.Themes,
+                    row.SemanticSummary,
+                    descriptorTerms))
+                .ThenBy(row => row.Distance)
+                .ToList();
+        }
+
         var candidates = new List<PlaylistCandidate>();
         var perArtist = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
@@ -167,4 +171,28 @@ public sealed class PgvectorPlaylistCandidateSearch(
 
         return new PlaylistCandidateSearchResult(candidates, HasIndexedTracks: true);
     }
+
+    private static int DescriptorMatchCount(
+        string? primaryMood,
+        IReadOnlyList<string> themes,
+        string semanticSummary,
+        IReadOnlyList<string> terms)
+    {
+        var count = 0;
+        foreach (var term in terms)
+        {
+            if (Contains(primaryMood, term)
+                || Contains(semanticSummary, term)
+                || themes.Any(theme => Contains(theme, term) || Contains(term, theme)))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool Contains(string? value, string term) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Contains(term, StringComparison.OrdinalIgnoreCase);
 }

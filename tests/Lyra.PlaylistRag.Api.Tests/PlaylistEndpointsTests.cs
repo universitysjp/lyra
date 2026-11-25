@@ -134,11 +134,11 @@ public class PlaylistEndpointsTests : IClassFixture<VectorPostgresTestFixture>
             services.AddScoped<IPlaylistQueryPlanner>(_ =>
                 new FakePlaylistQueryPlanner(() => new PlaylistQueryPlan(
                     "nothing",
-                    ["not-a-mood"],
+                    [],
                     [],
                     null,
                     null,
-                    null,
+                    "No Such Artist",
                     null,
                     "Empty",
                     "No tracks match.")));

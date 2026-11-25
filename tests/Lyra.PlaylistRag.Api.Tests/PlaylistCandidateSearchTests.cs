@@ -53,7 +53,7 @@ public class PlaylistCandidateSearchTests : IClassFixture<VectorPostgresTestFixt
     }
 
     [Fact]
-    public async Task SearchAsync_AppliesMoodThemeEnergyAndArtistFilters()
+    public async Task SearchAsync_AppliesHardEnergyArtistAndTitleFilters()
     {
         await ResetAsync();
         await using var db = CreateDb();
@@ -88,6 +88,35 @@ public class PlaylistCandidateSearchTests : IClassFixture<VectorPostgresTestFixt
         Assert.True(result.HasIndexedTracks);
         Assert.Single(result.Candidates);
         Assert.Equal(match, result.Candidates[0].TrackId);
+    }
+
+    [Fact]
+    public async Task SearchAsync_SoftDescriptorsDoNotEraseHighEnergyResults()
+    {
+        await ResetAsync();
+        await using var db = CreateDb();
+        var user = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var romantic = Guid.NewGuid();
+        var energetic = Guid.NewGuid();
+        AddTrack(db, user, romantic, "local-romantic", "Shape of You", "Ed Sheeran", VectorOf(0.8f, 0.2f), now,
+            mood: "Flirtatious, upbeat romantic dance-pop", themes: ["romance", "dancing"], energy: 7);
+        AddTrack(db, user, energetic, "local-energetic", "Believer", "Imagine Dragons", VectorOf(0f, 1f), now,
+            mood: "Defiant and resilient", themes: ["resilience", "inner strength"], energy: 8);
+        await db.SaveChangesAsync();
+
+        var result = await CreateSearch(db).SearchAsync(
+            user,
+            Plan(moods: ["romantic"], themes: ["love"], minEnergy: 7),
+            VectorOf(1, 0).ToArray(),
+            10,
+            CancellationToken.None);
+
+        Assert.True(result.HasIndexedTracks);
+        Assert.Equal(2, result.Candidates.Count);
+        Assert.Equal(romantic, result.Candidates[0].TrackId);
+        Assert.Contains(result.Candidates, candidate => candidate.TrackId == energetic);
     }
 
     [Fact]
@@ -155,7 +184,7 @@ public class PlaylistCandidateSearchTests : IClassFixture<VectorPostgresTestFixt
 
         var filtered = await search.SearchAsync(
             user,
-            Plan(moods: ["not-a-mood"]),
+            Plan(artist: "Not In This Library"),
             VectorOf(1, 0).ToArray(),
             10,
             CancellationToken.None);
