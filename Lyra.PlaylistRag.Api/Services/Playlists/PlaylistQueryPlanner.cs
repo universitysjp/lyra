@@ -64,17 +64,21 @@ public sealed class PlaylistQueryPlanner(
         PlaylistQueryPlan? plan;
         try
         {
-            var response = await chatClient.GetResponseAsync<PlaylistQueryPlan>(
+            plan = await StructuredPlaylistOutput.GetRequiredAsync<PlaylistQueryPlan>(
+                chatClient,
                 messages,
-                useJsonSchemaResponseFormat: true,
-                cancellationToken: ct);
-            plan = response.Result;
+                "The AI provider returned an invalid playlist query plan.",
+                ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
         catch (AiProviderException)
+        {
+            throw;
+        }
+        catch (PlaylistGenerationException)
         {
             throw;
         }

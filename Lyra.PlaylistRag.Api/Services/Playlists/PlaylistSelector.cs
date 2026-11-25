@@ -73,17 +73,21 @@ public sealed class PlaylistSelector(
         PlaylistSelection? selection;
         try
         {
-            var response = await chatClient.GetResponseAsync<PlaylistSelection>(
+            selection = await StructuredPlaylistOutput.GetRequiredAsync<PlaylistSelection>(
+                chatClient,
                 messages,
-                useJsonSchemaResponseFormat: true,
-                cancellationToken: ct);
-            selection = response.Result;
+                "The AI provider returned an invalid playlist selection.",
+                ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
         catch (AiProviderException)
+        {
+            throw;
+        }
+        catch (PlaylistGenerationException)
         {
             throw;
         }

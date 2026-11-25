@@ -81,6 +81,60 @@ public class PlaylistSelectorTests
     }
 
     [Fact]
+    public async Task SelectAsync_RetriesOnceWhenFirstStructuredResponseIsEmpty()
+    {
+        var calls = 0;
+        var fake = new FakeChatClient((_, _, _) =>
+        {
+            calls++;
+            var text = calls == 1
+                ? string.Empty
+                : """{"tracks":[{"index":1,"reason":"Fits the request."}]}""";
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text))
+            {
+                FinishReason = calls == 1 ? ChatFinishReason.Length : ChatFinishReason.Stop
+            });
+        });
+        var selector = CreateSelector(fake);
+
+        var selection = await selector.SelectAsync(
+            "calm evening",
+            Plan,
+            Candidates(3),
+            2,
+            Connection,
+            "session-1",
+            CancellationToken.None);
+
+        Assert.Equal(2, calls);
+        Assert.Equal(1, selection.Tracks.Single().Index);
+    }
+
+    [Fact]
+    public async Task SelectAsync_EmptyResponseReportsProviderFinishReason()
+    {
+        var fake = new FakeChatClient((_, _, _) => Task.FromResult(
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, string.Empty))
+            {
+                FinishReason = ChatFinishReason.ContentFilter
+            }));
+        var selector = CreateSelector(fake);
+
+        var exception = await Assert.ThrowsAsync<PlaylistGenerationException>(
+            () => selector.SelectAsync(
+                "calm evening",
+                Plan,
+                Candidates(3),
+                2,
+                Connection,
+                "session-1",
+                CancellationToken.None));
+
+        Assert.Contains("finish reason: content_filter", exception.Message);
+    }
+
+    [Fact]
     public async Task SelectAsync_MalformedJsonIsRejected()
     {
         var selector = CreateSelector(CreateFake("not-json"));

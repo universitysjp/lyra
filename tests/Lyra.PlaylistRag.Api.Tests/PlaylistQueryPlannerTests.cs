@@ -66,6 +66,44 @@ public class PlaylistQueryPlannerTests
     }
 
     [Fact]
+    public async Task PlanAsync_ParsesJsonWrappedInMarkdownFence()
+    {
+        var fake = CreateFake("""
+            ```json
+            {
+              "semanticQuery": "calm evening",
+              "moods": ["calm"],
+              "themes": ["evening"],
+              "playlistTitle": "Evening",
+              "playlistDescription": "A calm playlist."
+            }
+            ```
+            """);
+        var planner = CreatePlanner(fake);
+
+        var plan = await planner.PlanAsync("calm", Connection, "session-1", CancellationToken.None);
+
+        Assert.Equal("calm evening", plan.SemanticQuery);
+        Assert.Equal(ReasoningEffort.Low, fake.Options?.Reasoning?.Effort);
+    }
+
+    [Fact]
+    public async Task PlanAsync_EmptyResponseReportsProviderFinishReason()
+    {
+        var fake = new FakeChatClient((_, _, _) => Task.FromResult(
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, string.Empty))
+            {
+                FinishReason = ChatFinishReason.Length
+            }));
+        var planner = CreatePlanner(fake);
+
+        var exception = await Assert.ThrowsAsync<PlaylistGenerationException>(
+            () => planner.PlanAsync("request", Connection, "session-1", CancellationToken.None));
+
+        Assert.Contains("finish reason: length", exception.Message);
+    }
+
+    [Fact]
     public async Task PlanAsync_MalformedJsonIsRejected()
     {
         var planner = CreatePlanner(CreateFake("not-json"));
