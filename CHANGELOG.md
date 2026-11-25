@@ -33,6 +33,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Lyra.AI`: added `IAiEmbeddingGeneratorFactory` with OpenAI and OpenCode embedding providers. The OpenCode adapter uses the plan-specific inference endpoint and `x-opencode-session`, so OpenCode Go can generate embeddings with `text-embedding-3-small`.
 - `Lyra.PlaylistRag.Api`: replaced the unconfigured embedding placeholder with the OpenCode Go embedding generator. `Rag:Provider`, `Rag:Model`, `Rag:Dimensions`, `Rag:OpenCodePlan`, and `Rag__ApiKey` are validated at startup; the fixed dimension must match `vector(1536)`.
 - `tests/Lyra.AI.Tests`: embedding factory and OpenCode embedding HTTP tests covering plan endpoints, session header, model request body, plan/session validation, and dimension checks.
+- `Lyra.PlaylistRag.Api`: `POST /api/playlists/generate` with structured query planning, deployment-wide query embeddings, user-scoped pgvector search, mood/theme/energy/artist/title filters, max-two-per-artist diversification, one-based candidate-index selection, strict output validation, and problem+json mapping (`400`, `401`, `409`, `502`, `503`). Returned tracks contain only the caller's `LocalTrackId`s.
+- `Lyra.PlaylistRag.Api` / `Lyra.AI`: shared Identity AI-connection gRPC client moved into `Lyra.AI.Identity`; PlaylistRag resolves the caller's BYOK chat connection for prompt planning and selection while using `Rag__ApiKey` only for embeddings.
+- `prototype/lyra-player`: **Create playlist** page at `/playlists` with prompt ideas, track-count control, loading/error states, generated playlist hero, per-track reasons, local-file relinking, and queue playback; added the playlist API client and fake-backend coverage.
+- `tests/Lyra.PlaylistRag.Api.Tests`: query planner/selector validation, generation service hard-failure policy, candidate-search ownership/filter/diversification tests, and authenticated endpoint tests including `409` and `502` paths.
 - `tests/Lyra.PlaylistRag.Api.Tests`: pgvector migration/extension/HNSW/nearest-neighbour coverage, MassTransit consumer harness tests (including duplicate delivery and local metadata), and embedding-abstraction coverage.
 - `Lyra.Catalog.Api`: consumes `SongEnrichedEvent`, applies the first successful global enrichment atomically, and invalidates every linked user's Redis library cache; race-safe cache fills now use opaque version tokens.
 - `prototype/lyra-player`: AI provider settings page, enrichment status display, accessibility fixes, and backend/frontend test updates.
@@ -45,5 +49,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Planned
 
-- `Lyra.PlaylistRag.Api`: playlist query planner, user-scoped pgvector search, candidate selection, backfill, and `POST /api/playlists/generate`.
-- React client: playlist creation and playback UI.
+- `Lyra.PlaylistRag.Api`: lazy Catalog gRPC backfill for libraries imported before PlaylistRag existed.
+- React client: saved playlist history and server-side playlist persistence.

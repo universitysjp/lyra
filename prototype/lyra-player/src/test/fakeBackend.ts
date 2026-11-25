@@ -1,8 +1,11 @@
 import type {
   AiConnectionDto,
   AiProvider,
+  GeneratePlaylistRequest,
   OpenCodePlan,
   PagedResponse,
+  PlaylistDto,
+  PlaylistTrackDto,
   TrackDto,
   TrackLyricsDto,
   TrackMetadataItem,
@@ -51,8 +54,11 @@ export interface FakeBackend {
   lyrics: Map<string, TrackLyricsDto>;
   requests: string[];
   batchCalls: TrackMetadataItem[][];
+  playlistRequests: GeneratePlaylistRequest[];
+  playlistError: { status: number; title: string; detail: string } | null;
   reset: () => void;
   setLyrics: (trackId: string, lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>) => void;
+  seedAiConnection: (provider?: AiProvider, model?: string) => void;
 }
 
 export const DEMO_EMAIL = 'listener@example.com';
@@ -104,9 +110,12 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
     lyrics: new Map<string, TrackLyricsDto>(),
     requests: [],
     batchCalls: [],
+    playlistRequests: [],
+    playlistError: null,
     fetchImpl: undefined as unknown as typeof fetch,
     reset,
     setLyrics,
+    seedAiConnection,
   };
 
   function reset(): void {
@@ -118,8 +127,23 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
     tracks.length = 0;
     backend.requests.length = 0;
     backend.batchCalls.length = 0;
+    backend.playlistRequests.length = 0;
+    backend.playlistError = null;
 
     (options.tracks ?? []).forEach((item) => upsert(item, users[0].userId));
+  }
+
+  function seedAiConnection(provider: AiProvider = 'OpenAI', model = 'gpt-test'): void {
+    const now = new Date().toISOString();
+
+    aiConnections.set(users[0].userId, {
+      provider,
+      model,
+      apiKey: 'test-key',
+      openCodePlan: provider === 'OpenCode' ? 'Go' : null,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   function setLyrics(trackId: string, lyrics: Omit<TrackLyricsDto, 'trackId' | 'isEnriched'>): void {
@@ -392,6 +416,73 @@ export const createFakeBackend = (options: FakeBackendOptions = {}): FakeBackend
       aiConnections.delete(user.userId);
 
       return noContent();
+    }
+
+    if (path === '/api/playlists/generate' && method === 'POST') {
+      const input = (body ?? {}) as Partial<GeneratePlaylistRequest>;
+      const prompt = input.prompt?.trim() ?? '';
+      const limit = input.limit ?? 20;
+
+      backend.playlistRequests.push({ prompt, limit });
+
+      if (backend.playlistError) {
+        return problem(
+          backend.playlistError.status,
+          backend.playlistError.title,
+          backend.playlistError.detail,
+        );
+      }
+
+      if (!prompt) {
+        return problem(400, 'Invalid playlist request', 'A non-empty playlist prompt is required.');
+      }
+
+      if (prompt.length > 2000) {
+        return problem(
+          400,
+          'Invalid playlist request',
+          'The playlist prompt cannot exceed 2000 characters.',
+        );
+      }
+
+      if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+        return problem(400, 'Invalid playlist request', 'The playlist limit must be between 1 and 50.');
+      }
+
+      if (!aiConnections.has(user.userId)) {
+        return problem(
+          409,
+          'AI provider not configured',
+          'Connect an AI provider in settings before generating a playlist.',
+        );
+      }
+
+      const owned = libraryOf(user.userId);
+
+      if (owned.length === 0) {
+        return problem(
+          409,
+          'Library is not ready',
+          'No indexed tracks are available for this user yet.',
+        );
+      }
+
+      const tracks: PlaylistTrackDto[] = owned.slice(0, limit).map((track) => ({
+        localTrackId: track.localTrackId,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        durationSeconds: track.durationSeconds,
+        reason: `Fits “${prompt}”.`,
+      }));
+
+      const playlist: PlaylistDto = {
+        title: prompt.length <= 120 ? prompt : `${prompt.slice(0, 117)}…`,
+        description: 'A playlist drawn only from your own library.',
+        tracks,
+      };
+
+      return json(200, playlist);
     }
 
     if (path === '/api/catalog/tracks/batch' && method === 'POST') {

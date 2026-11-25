@@ -1,6 +1,36 @@
-@Lyra.PlaylistRag.Api_HostAddress = http://localhost:5062
+@gatewayUrl = http://localhost:5000
 
-GET {{Lyra.PlaylistRag.Api_HostAddress}}/weatherforecast/
+### Login through Gateway
+# @name login
+POST {{gatewayUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Password123!"
+}
+
+### Generate a playlist from the caller's own library
+@accessToken = {{login.response.body.accessToken}}
+POST {{gatewayUrl}}/api/playlists/generate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "prompt": "Late-night drive through the city, calm but not sleepy.",
+  "limit": 20
+}
+
+### Generate a playlist without a token (Expect 401)
+POST {{gatewayUrl}}/api/playlists/generate
+Content-Type: application/json
+
+{
+  "prompt": "Late-night drive",
+  "limit": 20
+}
+
+### Playlist ping (Requires Token)
+GET {{gatewayUrl}}/api/playlists/ping
+Authorization: Bearer {{accessToken}}
 Accept: application/json
-
-###

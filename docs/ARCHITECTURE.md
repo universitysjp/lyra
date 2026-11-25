@@ -94,15 +94,20 @@ No service-specific logic lives here — only contracts.
 
 ### 2.6 `Lyra.PlaylistRag.Api` (ASP.NET Core Web API)
 
+- Consumes `SongImportedEvent` to build the per-user `(UserId, TrackId) → LocalTrackId` ownership map. Ownership never comes from `SongEnrichedEvent`, whose `UserId` only identifies the user who triggered enrichment.
 - Consumes `SongEnrichedEvent`:
   - Uses the event's `ResolvedMetadata` (LRCLIB title/artist/album/duration/instrumental) as the canonical track shape for embedding summaries and later playlist filters, while keeping the user's `LocalTrackId` for playback.
   - Generates one deployment-wide embedding per global track using OpenCode Go `text-embedding-3-small` (1536 dimensions); user BYOK connections are reserved for prompt rewriting and playlist selection.
   - Upserts embeddings into PostgreSQL using `pgvector`, with an `HNSW` cosine-distance index.
 - `POST /api/playlists/generate`:
-  1. Rewrites the user's natural-language prompt into metadata filters plus a semantic search query.
-  2. Executes a `pgvector` similarity search strictly scoped to the authenticated `UserId`.
-  3. Uses an LLM to select and sequence the top matching tracks into a cohesive playlist.
-  4. Returns the user's `LocalTrackId`s (never server-side track IDs, since the client owns the audio files locally).
+  1. Resolves the caller's encrypted AI connection over Identity's private gRPC service. Missing connection returns `409`.
+  2. Rewrites the natural-language prompt into a validated query plan (semantic query, moods, themes, energy range, optional artist/title, playlist title/description) using structured JSON output.
+  3. Embeds the semantic query with the deployment-wide embedding model.
+  4. Executes a `pgvector` cosine search joined through `user_tracks`, so results are strictly scoped to the authenticated `UserId`; applies metadata filters, caps repeat artists, and keeps a bounded candidate set.
+  5. Sends one-based candidate indices (not GUIDs) to the user's chat model, then validates count, range, uniqueness and reasons. Invalid output returns `502`; there is no fallback playlist.
+  6. Maps selected candidates back to the user's own `LocalTrackId`s.
+- Distinguishes an unindexed library (`409`) from a valid query whose filters matched nothing (`200` with an empty track list). Transient AI/Identity failures return `503`; other provider rejections return `502`.
+- The React client exposes this flow under **Create playlist** (`/playlists`) with prompt, track-count, loading, error, result and playback states.
 - Database: `vector_db` (PostgreSQL + `pgvector`).
 
 ## 3. Event Flow
@@ -124,7 +129,7 @@ Lyra.Catalog.Api ──SongImportedEvent──▶ RabbitMQ ──▶ Lyra.Enrich
                                                embeddings upserted into vector_db
 ```
 
-- `Lyra.Catalog.Api` consumes `SongLyricsFetchedEvent` (lyrics only, not enriched) and `SongEnrichedEvent` (full enrichment). `Lyra.PlaylistRag.Api` consumes `SongEnrichedEvent` independently.
+- `Lyra.Catalog.Api` consumes `SongLyricsFetchedEvent` (lyrics only, not enriched) and `SongEnrichedEvent` (full enrichment). `Lyra.PlaylistRag.Api` consumes `SongImportedEvent` for per-user ownership and `SongEnrichedEvent` independently for embeddings.
 
 **Catalog ingestion and the outbox**
 

@@ -2,7 +2,7 @@ import { albumGroupId, artworkFor } from '../utils/artwork';
 import { localAudioUrl } from '../utils/localAudioStore';
 import { formatDuration } from '../utils/toolbox';
 import type { LocalTrack } from '../utils/localFiles';
-import type { TrackDto, TrackMetadataItem } from '../types/lyra';
+import type { PlaylistTrackDto, TrackDto, TrackMetadataItem } from '../types/lyra';
 import type { IAlbumGroup, ITrack } from '../types/types';
 
 const SINGLES_LABEL = 'Singles';
@@ -30,6 +30,26 @@ export const toTrack = (dto: TrackDto, no: number): ITrack => {
 };
 
 export const toTracks = (dtos: TrackDto[]): ITrack[] => dtos.map((dto, index) => toTrack(dto, index + 1));
+
+/** Maps generated playlist entries onto the playback model, keyed by the local file id. */
+export const playlistToTracks = (tracks: PlaylistTrackDto[]): ITrack[] =>
+  tracks.map((track, index) =>
+    toTrack(
+      {
+        id: track.localTrackId,
+        localTrackId: track.localTrackId,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        durationSeconds: track.durationSeconds,
+        isEnriched: true,
+        hasLyrics: false,
+        hasSyncedLyrics: false,
+        importedAt: new Date(0).toISOString(),
+      },
+      index + 1,
+    ),
+  );
 
 /** Re-reads the local audio registry, e.g. after the user attaches a file. */
 export const withLocalAudio = (tracks: ITrack[]): ITrack[] =>

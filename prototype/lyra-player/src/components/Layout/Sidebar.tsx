@@ -6,6 +6,7 @@ const LINKS: [string, string, string][] = [
   ['/library', 'Library', 'home'],
   ['/search', 'Search', 'search'],
   ['/albums', 'Albums', 'album'],
+  ['/playlists', 'Create playlist', 'queue_music'],
   ['/import', 'Add music', 'add_box'],
   ['/settings', 'AI provider', 'tune'],
 ];

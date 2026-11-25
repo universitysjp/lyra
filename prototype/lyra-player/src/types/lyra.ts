@@ -55,6 +55,28 @@ export interface TrackLyricsDto {
   syncedLyrics: string | null;
 }
 
+/** POST /api/playlists/generate through the gateway. */
+export interface GeneratePlaylistRequest {
+  prompt: string;
+  limit?: number;
+}
+
+/** One generated entry. Audio stays local, so the backend returns LocalTrackId. */
+export interface PlaylistTrackDto {
+  localTrackId: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  durationSeconds: number;
+  reason: string | null;
+}
+
+export interface PlaylistDto {
+  title: string;
+  description: string;
+  tracks: PlaylistTrackDto[];
+}
+
 export interface PagedResponse<T> {
   items: T[];
   page: number;

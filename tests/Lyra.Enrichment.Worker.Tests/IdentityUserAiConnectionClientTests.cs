@@ -2,8 +2,8 @@ namespace Lyra.Enrichment.Worker.Tests;
 
 using global::Grpc.Core;
 using Lyra.Contracts.AI;
-using Lyra.Enrichment.Worker.Configuration;
-using Lyra.Enrichment.Worker.Services.AiConnections;
+using Lyra.AI.Identity;
+
 using Lyra.Enrichment.Worker.Tests.TestDoubles;
 using Microsoft.Extensions.Options;
 using Xunit;

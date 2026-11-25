@@ -1,4 +1,4 @@
-namespace Lyra.Enrichment.Worker.Configuration;
+namespace Lyra.AI.Identity;
 
 public sealed class IdentityOptions
 {

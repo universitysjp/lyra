@@ -3,6 +3,7 @@ import { createContext } from 'react';
 import type { AiConnectionsApi } from '../api/aiConnections';
 import type { AuthApi } from '../api/auth';
 import type { CatalogApi } from '../api/catalog';
+import type { PlaylistsApi } from '../api/playlists';
 import type { LyraClient } from '../api/http';
 
 export interface IApiContext {
@@ -10,6 +11,7 @@ export interface IApiContext {
   auth: AuthApi;
   catalog: CatalogApi;
   aiConnections: AiConnectionsApi;
+  playlists: PlaylistsApi;
 }
 
 const unavailable = (): never => {
@@ -32,6 +34,7 @@ export const ApiContext = createContext<IApiContext>({
     getTrackLyrics: unavailable,
   },
   aiConnections: { get: unavailable, save: unavailable, remove: unavailable },
+  playlists: { generate: unavailable },
 });
 
 export default ApiContext;

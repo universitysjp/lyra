@@ -182,11 +182,12 @@ Rag__ApiKey=<your OpenCode Go key>
 
 ### Run the Enrichment Pipeline
 
-Run Identity, Catalog, and the Worker together (RabbitMQ, PostgreSQL, and Redis must be up):
+Run Identity, Catalog, PlaylistRag, and the Worker together (RabbitMQ, PostgreSQL, and Redis must be up):
 
 ```bash
-dotnet run --project Lyra.Identity.Api   # REST :5001, internal gRPC :5004
-dotnet run --project Lyra.Catalog.Api    # REST :5002
+dotnet run --project Lyra.Identity.Api     # REST :5001, internal gRPC :5004
+dotnet run --project Lyra.Catalog.Api      # REST :5002
+dotnet run --project Lyra.PlaylistRag.Api  # REST :5003
 dotnet run --project Lyra.Enrichment.Worker
 ```
 
@@ -217,6 +218,12 @@ Transient failures (`408`, `429`, `5xx`, network timeouts) are never cached; the
 The React prototype stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
 
 When a track is playing, the player exposes a lyrics button. Synced LRC lines highlight and auto-scroll with playback and can be clicked to seek; plain lyrics are rendered as static text. The panel fetches only the current track's lyrics from the dedicated endpoint.
+
+### Generate a Playlist in the React Client
+
+Open **Create playlist** (`/playlists`) after at least one track has been enriched. Enter a mood, activity, or kind of sound, choose a track count, and select **Build playlist**. The client calls `POST /api/playlists/generate` through the Gateway and renders the returned title, description, reasons, and tracks. Playback uses the caller's own local files, just like library playback.
+
+Generation is intentionally strict: a missing AI provider returns `409`, an unindexed library returns `409`, and invalid model output returns `502` rather than a fallback playlist. Prompt rewrites and track selection use the signed-in user's BYOK chat connection; query embeddings use the deployment-wide `Rag__ApiKey`.
 
 ## Contributing
 
