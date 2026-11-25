@@ -86,6 +86,7 @@ tests/
   Lyra.Catalog.Api.Tests/
   Lyra.AI.Tests/
   Lyra.Enrichment.Worker.Tests/
+  Lyra.PlaylistRag.Api.Tests/
 docs/
   ARCHITECTURE.md
 docker-compose.yml
