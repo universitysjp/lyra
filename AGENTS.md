@@ -2,12 +2,22 @@
 
 This file defines conventions, guardrails, and context for AI coding agents (and human contributors) working on the **Lyra** codebase. Read this before generating or modifying any code in this repository.
 
+## 0. Working agreement (read this first)
+
+1. **Read the docs before you touch anything.** Start with `README.md`, the top of `CHANGELOG.md`, and `docs/ARCHITECTURE.md`; then read the document that matches the task (§8). Do not work from memory.
+2. **Documentation ships in the same commit as the code.** A change that alters documented behaviour without updating the document is incomplete (§8).
+3. **Architecture decisions get an ADR** in `docs/decisions/` before or with the change (§9). No rewriting accepted ADRs — supersede them.
+4. **Log every change** in `CHANGELOG.md`, newest first, same commit.
+5. **Preserve user changes.** Inspect the working tree before every write. Never reset, restore, stash-drop, or overwrite uncommitted work.
+
+If a document and the code disagree, **the code is the fact and the document is the bug**: fix the document in the same change and log it.
+
 ## 1. Project Overview
 
 Lyra is a backend microservices platform for an AI-powered local music mobile application.
 
 - **Core Concept:** Audio files stay locally on the user's mobile device (Flutter client). The mobile app extracts ID3 metadata from local tracks and syncs it in batches to the backend.
-- **Pipeline:** Incoming track metadata is stored for fast retrieval, then asynchronously enriched via RabbitMQ: fetching lyrics from LRCLIB, categorizing mood/themes/energy via an LLM, and generating vector embeddings stored in PostgreSQL (`pgvector`). Users can prompt a RAG endpoint to generate custom playlists from their own local catalog.
+- **Pipeline:** Incoming track metadata is stored for fast retrieval, then asynchronously enriched via RabbitMQ: fetching lyrics from LRCLIB, categorizing mood/themes/energy via an LLM. `Lyra.PlaylistRag.Api` embeds the enriched catalog into PostgreSQL (`pgvector`) and serves a RAG endpoint that generates and sequences playlists from the user's own catalog.
 
 ## 2. Solution & Microservices Architecture (Database-per-Service)
 
@@ -29,8 +39,8 @@ Lyra is a backend microservices platform for an AI-powered local music mobile ap
    - Step 3: Use `Microsoft.Extensions.AI` with Structured Outputs (JSON schema) to extract `PrimaryMood`, `Themes` (list), and `EnergyLevel` (1–10).
    - Step 4: Publish `SongEnrichedEvent` containing both lyric forms, resolved metadata, extracted tags, and a combined semantic summary string.
 6. **`Lyra.PlaylistRag.Api`** (ASP.NET Core Web API):
-   - Consumes `SongEnrichedEvent`, generates vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`), and upserts them into PostgreSQL with `pgvector` (`HNSW` cosine distance index).
-   - Exposes `POST /api/playlists/generate`: rewrites user prompt into metadata filters + semantic search query, executes `pgvector` similarity search strictly scoped to `UserId`, and uses an LLM to select/sequence the top tracks into a cohesive playlist returning the user's `LocalTrackId`s.
+   - Consumes `SongImportedEvent` to maintain the per-user `(UserId, TrackId) → LocalTrackId` ownership map, and `SongEnrichedEvent` to embed each global track once with the deployment-wide OpenCode Go `text-embedding-3-small` model (1536 dimensions), upserting into PostgreSQL `pgvector` with an `HNSW` cosine distance index.
+   - Exposes `POST /api/playlists/generate`: resolves the caller's encrypted AI connection over Identity's private gRPC service, rewrites the prompt into a validated query plan, embeds the semantic query, runs a `pgvector` cosine search joined through `user_tracks` (strict `UserId` scope) with hard energy/artist/title filters and soft mood/theme ranking, then uses the user's chat model to select and sequence candidates. Returns only the caller's `LocalTrackId`s; invalid selection output fails (`502`) instead of falling back.
    - Database: `vector_db` (PostgreSQL + `pgvector`).
 
 ## 3. Infrastructure & Approved Stack
@@ -59,9 +69,13 @@ Do not introduce alternative databases, brokers, caches, or AI abstraction libra
 
 - Solution file: `Lyra.slnx` (new XML-based solution format). Add new projects to this file, not to a generated `.sln`.
 - Source projects live under the repository root (`<ProjectName>/`), matching the project's namespace and assembly name exactly.
+- Clients that are not .NET services (the React dev client today, the Flutter app later) live under `clients/<client-name>/`. Never under `prototype/` — that name is reserved for throwaway spikes and signals "safe to delete".
 - Tests live under `tests/<ProjectName>.Tests/`, mirroring the corresponding project name.
 - Each service owns a single `appsettings.json` / `appsettings.Development.json`; never hardcode connection strings, broker credentials, or AI provider API keys — keep all secrets in the gitignored repository-root `.env` file (template: `.env.example`). Docker Compose reads it directly; .NET services load it via `DotNetEnv` so `Section__Key` variables map onto the standard configuration system. Environment variables and user secrets remain valid overrides.
 - Docker Compose definitions for local infrastructure (PostgreSQL instances, RabbitMQ, Redis) belong in `docker-compose.yml` at the repository root.
+- Build settings are centralized in `Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings-as-errors) and `.editorconfig`. Do not re-specify those defaults per project; the build stays at zero warnings. `global.json` pins the SDK.
+- Vendored agent-skill packs (`skills/`), IDE state (`.idea/`), and agent tool plans/state (`.junie/`) are local-only developer tooling; they are gitignored and must not be committed.
+- `clients/lyra-player` runs on Vite+ (`vite-plus`): `vp dev`, `vp build`, `vp test`, `vp lint`, `vp fmt`, `vp check`. Do not add separate `vite`, `vitest`, `eslint`, or `prettier` dependencies; Vitest and Oxc are bundled.
 
 ## 6. Testing Expectations
 
@@ -76,3 +90,66 @@ Do not introduce alternative databases, brokers, caches, or AI abstraction libra
 - Do not invent endpoints, event names, or fields not specified in this document or an explicit task description; ask for clarification instead of guessing when requirements are ambiguous.
 - Always propagate `CancellationToken` through new async methods you introduce.
 - When adding a new microservice, update `README.md`, `docs/ARCHITECTURE.md`, and this file's service list consistently.
+- Never discard uncommitted work. Before editing, read the file and its `git diff`; make narrow patches; recheck `git status` before each write and stop to ask if an edit would conflict with newly appeared work.
+- Do not commit changes you did not author (for example a pre-existing `LICENSE` rename) unless the task explicitly asks for it.
+
+## 8. Documentation-first workflow
+
+`docs/ARCHITECTURE.md` is the detailed description of the backend; `README.md` is the public overview; `CHANGELOG.md` is the change log. Before any task:
+
+1. Read `README.md`, the newest rows of `CHANGELOG.md`, and `docs/ARCHITECTURE.md`.
+2. Read the specific document for the task from the table below.
+3. If the behaviour you need is not described anywhere, describe it first (docs or ADR), then implement.
+
+| Task | Read / update |
+| --- | --- |
+| Any change at all | `README.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` |
+| New or changed endpoint, event, or DB schema | `docs/ARCHITECTURE.md` (service catalog + data flow), and the service README row |
+| New microservice or project | `README.md` (services + layout), `docs/ARCHITECTURE.md`, this file §2 |
+| New config key, env var, or secret | `.env.example`, the owning `appsettings.json`, `docs/ARCHITECTURE.md` if it changes deployment |
+| New contract record in `Lyra.Contracts` | `docs/ARCHITECTURE.md` (event flow), this file §4 |
+| Gateway route, auth, rate limit change | `docs/ARCHITECTURE.md` §Gateway, this file §3 |
+| Local infrastructure / compose change | `README.md` getting started, `docs/ARCHITECTURE.md` |
+| A design question ("why is X like this?") | `docs/decisions/README.md` |
+| Something nobody has decided yet | write a `Proposed` ADR, then ask |
+
+Rules:
+
+- Documentation updates land **in the same commit** as the code they describe.
+- Anything that was documented as "planned" and is now built replaces the planned text.
+- Docs never claim a feature exists when the project is still a stub. Say "planned" explicitly.
+
+## 9. Architecture decision records
+
+Every decision that is expensive to reverse — service boundaries, data ownership, message contracts, external dependencies, security posture, deployment topology, repository layout — needs an ADR in `docs/decisions/`.
+
+- File name: `ADR-nnnn-short-slug.md`, next free number.
+- Required sections: **Status / Date / Deciders / Context / Decision / Consequences / Alternatives considered**.
+- Statuses: `Proposed`, `Accepted`, `Rejected`, `Superseded by ADR-nnnn`.
+- Add a row to `docs/decisions/README.md` in the same commit.
+- Never edit an accepted ADR's decision. Write a new ADR that supersedes it and update the old one's status line only.
+- If the decision is not confirmed by the owner, mark it `Proposed` and say what confirmation is needed.
+- Template: `docs/decisions/ADR-template.md`.
+
+## 10. Change flow and commits
+
+1. Describe the intended behaviour (docs or ADR) if it is missing.
+2. Implement in a narrow, reviewable change.
+3. Verify: `dotnet build Lyra.slnx` (warnings are errors), plus `dotnet test tests/<affected>` / `bun run check && bun run build` in `clients/lyra-player` when touched.
+4. Update docs (§8), add a CHANGELOG row, and add an ADR when §9 applies — all in the same commit.
+5. Commit subject: `<type>: <lowercase summary>` with `add:`, `fix:`, or `update:` (§11).
+6. Push to a branch and open a pull request to `main`. `main` is deployable; the owner merges.
+
+CI must stay green. A pull request that changes code without a `CHANGELOG.md` row is incomplete.
+
+## 11. Commit messages
+
+`<type>: <short summary>` — lowercase type, colon, imperative summary, no trailing period.
+
+| Type | Use for |
+| --- | --- |
+| `add:` | a new feature, project, dependency, or capability |
+| `fix:` | a defect or broken behaviour |
+| `update:` | documentation, configuration, or behaviour change that is neither of the above |
+
+One logical batch per commit. Documentation and the CHANGELOG row belong to the same commit as the code.

@@ -20,8 +20,14 @@ using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using IdentityGrpcClient = Lyra.Contracts.Grpc.Identity.UserAiConnectionService.UserAiConnectionServiceClient;
 
-// Load local secrets (connection strings, broker credentials) from the repository-root .env file.
-Env.Load(options: new LoadOptions().TraversePath());
+// Load local secrets (connection strings, broker credentials) from the repository-root .env
+// file in local development only; production reads injected environment variables only.
+var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+if (string.IsNullOrEmpty(environmentName)
+    || environmentName.Equals("Development", StringComparison.OrdinalIgnoreCase))
+{
+    Env.Load(options: new LoadOptions().TraversePath());
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Integration tests start PostgreSQL through Testcontainers, which needs
+      # the Docker daemon already present on ubuntu-latest.
+      - name: Restore
+        run: dotnet restore Lyra.slnx
+
+      - name: Build (warnings are errors)
+        run: dotnet build Lyra.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test Lyra.slnx --no-build -c Release --verbosity normal
+
+  client:
+    name: client
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: clients/lyra-player
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Check (format, lint, types)
+        run: bun run check
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build

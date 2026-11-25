@@ -24,21 +24,4 @@
     <ProjectReference Include="..\Lyra.Contracts\Lyra.Contracts.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Contracts\" />
-    <Folder Include="Entities\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Contracts\AuthDtos.cs" />
-    <Compile Remove="Data\IdentityDesignTimeDbContextFactory.cs" />
-    <Compile Remove="Entities\ApplicationUser.cs" />
-    <Compile Remove="Services\IRefreshTokenService.cs" />
-    <Compile Remove="Services\IRsaKeyProvider.cs" />
-    <Compile Remove="Services\ITokenService.cs" />
-    <Compile Remove="Services\RefreshTokenService.cs" />
-    <Compile Remove="Services\RsaKeyProvider.cs" />
-    <Compile Remove="Services\TokenService.cs" />
-  </ItemGroup>
-
 </Project>

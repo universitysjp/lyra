@@ -30,6 +30,8 @@ public class AuthEndpointsTests : IClassFixture<PostgresTestFixture>
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
+            // Tests own the database container; do not depend on a local .env file.
+            builder.UseSetting("ConnectionStrings:IdentityDb", _fixture.ConnectionString);
 
             builder.ConfigureServices(services =>
             {

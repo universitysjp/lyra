@@ -1,6 +1,6 @@
 # Lyra
 
-**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging, vector embeddings) and exposes a Retrieval-Augmented Generation (RAG) endpoint for generating custom playlists from the user's own catalog.
+**Lyra** is an event-driven .NET microservices backend for an AI-powered local music mobile application. Audio files never leave the user's device — the Flutter mobile client extracts ID3 metadata from locally stored tracks and syncs it in batches to Lyra, which enriches each track asynchronously (lyrics, mood/theme tagging). `Lyra.PlaylistRag.Api` turns that enriched catalog into vector embeddings and generates custom playlists from the user's own tracks through Retrieval-Augmented Generation (RAG).
 
 ## Table of Contents
 
@@ -22,8 +22,8 @@
    - Fetch plain and synced lyrics from [LRCLIB](https://lrclib.net/). Metadata is normalized for the query only (file extensions and filename noise such as `(mp3.pm)` are stripped), then an exact lookup is attempted. If LRCLIB returns `404`, the v2 search endpoint supplies candidate metadata which is scored title-first (55% title, 30% duration, 15% artist) before the best qualifying candidate is fetched.
    - Store whatever lyrics were found **before** resolving the AI provider, so a missing/broken AI connection never loses successful lyrics.
    - Categorize mood, themes, and energy level via an LLM using `Microsoft.Extensions.AI` and the caller's encrypted, per-user AI provider connection.
-4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries) and `Lyra.PlaylistRag.Api` (generates vector embeddings into PostgreSQL `pgvector`).
-5. Users can prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog.
+4. A `SongEnrichedEvent` is published and consumed independently by `Lyra.Catalog.Api` (marks tracks enriched and invalidates linked users' cached libraries) and by `Lyra.PlaylistRag.Api` (upserts vector embeddings into PostgreSQL `pgvector`). `Lyra.PlaylistRag.Api` also consumes `SongImportedEvent` to keep a per-user `(UserId, TrackId) → LocalTrackId` ownership map.
+5. Users prompt the RAG endpoint (`POST /api/playlists/generate`) to generate custom playlists drawn exclusively from their own local catalog. The service resolves the caller's encrypted AI connection, rewrites the prompt into filters plus a semantic query, searches `vector_db` scoped to the caller, and returns the caller's `LocalTrackId`s. The React client exposes the flow under **Create playlist**.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ Lyra follows a **database-per-service** microservices architecture with asynchro
                  ┌─────────────────┼─────────────────────┐
                  ▼                 ▼                      ▼
        Lyra.Identity.Api   Lyra.Catalog.Api      Lyra.PlaylistRag.Api
-        (identity_db)        (catalog_db)             (vector_db)
+        (identity_db)        (catalog_db)         (vector_db)
                                    │   ▲                    ▲
                         SongImportedEvent │          SongEnrichedEvent
                                    ▼   │                    │
@@ -58,7 +58,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown of e
 | `Lyra.Identity.Api` | ASP.NET Core Web API | Registration, login, JWT issuance, encrypted per-user AI provider connections, private gRPC lookup | `identity_db` |
 | `Lyra.Catalog.Api` | ASP.NET Core Web API | Batch track ingestion, dedup, fuzzy search, Redis cache-aside, enrichment state | `catalog_db` |
 | `Lyra.Enrichment.Worker` | Background Worker Service | Lyrics fetch (LRCLIB exact + fuzzy fallback) + LLM mood/theme/energy extraction | — |
-| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Embedding generation, `pgvector` similarity search, RAG playlist generation | `vector_db` |
+| `Lyra.PlaylistRag.Api` | ASP.NET Core Web API | Event ingestion into `vector_db`, deployment-wide embeddings, user-scoped `pgvector` search, and `POST /api/playlists/generate` | `vector_db` |
 
 ## Technology Stack
 
@@ -79,8 +79,8 @@ Lyra.Identity.Api/
 Lyra.Catalog.Api/
 Lyra.AI/                 # Shared Microsoft.Extensions.AI provider adapter
 Lyra.Enrichment.Worker/
-Lyra.PlaylistRag.Api/
-prototype/lyra-player/   # React/Vite client used to exercise the backend
+Lyra.PlaylistRag.Api/     # RAG event ingestion, embeddings, and playlist generation
+clients/lyra-player/      # React/Vite reference client used to exercise the backend
 tests/
   Lyra.Identity.Api.Tests/
   Lyra.Catalog.Api.Tests/
@@ -103,7 +103,7 @@ CHANGELOG.md
 
 ### Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) — the exact SDK is pinned in [`global.json`](global.json) (`10.0.404`)
 - [Docker](https://www.docker.com/) & Docker Compose (for PostgreSQL, RabbitMQ, Redis)
 - An API key for your chosen `Microsoft.Extensions.AI` provider (e.g. Gemini or OpenAI)
 
@@ -116,7 +116,7 @@ dotnet restore Lyra.slnx
 cp .env.example .env   # then edit .env with your local credentials
 ```
 
-All usernames, passwords, and connection strings live in the repository-root `.env` file, which is **gitignored** (never commit it). `.env.example` is the committed template documenting every variable. Docker Compose reads `.env` automatically, and `Lyra.Identity.Api` / `Lyra.Catalog.Api` load it at startup via [DotNetEnv](https://www.nuget.org/packages/DotNetEnv), mapping `Section__Key` variables (e.g. `ConnectionStrings__IdentityDb`, `RabbitMq__Password`) onto standard .NET configuration. No credentials are stored in `appsettings*.json`.
+All usernames, passwords, and connection strings live in the repository-root `.env` file, which is **gitignored** (never commit it). `.env.example` is the committed template documenting every variable. Docker Compose reads `.env` automatically, and in local development `Lyra.Identity.Api`, `Lyra.Catalog.Api`, and `Lyra.Enrichment.Worker` load it via [DotNetEnv](https://www.nuget.org/packages/DotNetEnv), mapping `Section__Key` variables (e.g. `ConnectionStrings__IdentityDb`, `RabbitMq__Password`) onto standard .NET configuration. Outside Development the services read injected environment variables only and never look for a `.env` file. No credentials are stored in `appsettings*.json`.
 
 ### Run Infrastructure Dependencies
 
@@ -213,9 +213,24 @@ LRCLIB matching is configurable in `Lyra.Enrichment.Worker/appsettings.json` und
 
 Transient failures (`408`, `429`, `5xx`, network timeouts) are never cached; they surface as `LrclibRequestException` so MassTransit retries them.
 
+### Run the React Client
+
+The client uses Vite+ (`vp`) as its single toolchain: the dev server, production build, Vitest tests, Oxlint, and Oxfmt all come from the `vite-plus` dependency. There is no separate `vite`, `vitest`, or `prettier` install.
+
+```bash
+cd clients/lyra-player
+bun install
+bun run dev        # http://localhost:3000, proxies /api to http://localhost:5000
+bun run check      # format check + lint + type check
+bun run test       # Vitest
+bun run build      # production build
+```
+
+Set `VITE_BACKEND_URL` in a local `.env.local` file to point the dev proxy at a different gateway.
+
 ### Local Files and Lyrics in the React Client
 
-The React prototype stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
+The React reference client stores attached audio `File` objects in IndexedDB, keyed by the same `localTrackId` the importer generates. This survives page reloads, so library rows stay playable instead of reverting to **Attach file**. Use **Connect local files** on the library page to relink files imported before persistence existed; files are matched by name, size, and last-modified timestamp.
 
 When a track is playing, the player exposes a lyrics button. Synced LRC lines highlight and auto-scroll with playback and can be clicked to seek; plain lyrics are rendered as static text. The panel fetches only the current track's lyrics from the dedicated endpoint.
 
@@ -229,13 +244,17 @@ Generation is intentionally strict: a missing AI provider returns `409`, an unin
 
 Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
+Every push to `main` and every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml): the backend is restored, built with warnings as errors, and tested (the PostgreSQL integration tests use Testcontainers), and the React client is typechecked, tested, and built.
+
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md) — conventions and guardrails for AI coding agents working in this repository.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — detailed service/event architecture.
+- [`docs/decisions/`](docs/decisions/README.md) — architecture decision records (why the boundaries are where they are).
+- [`docs/plans/`](docs/plans/README.md) — historical implementation plans kept for provenance.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow and coding standards.
 - [`CHANGELOG.md`](CHANGELOG.md) — notable changes across versions.
 
 ## License
 
-See [`LICENSE`](LICENSE).
+See [`LICENSE.md`](LICENSE.md).

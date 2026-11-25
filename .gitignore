@@ -19,3 +19,14 @@ http-client.private.env.json
 
 # Local browser-audit artifacts
 .playwright-cli/
+
+# Test and coverage output
+TestResults/
+*.trx
+coverage/
+.vs/
+
+# Vendored agent-skill packs, IDE state, and agent tool plans/state stay local — never commit them.
+/skills/
+/.idea/
+/.junie/

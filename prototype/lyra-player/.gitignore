@@ -1,4 +1,0 @@
-# Local browser-audit artifacts (Playwright CLI snapshots and screenshots)
-/.playwright-cli/
-/*.yml
-/*.png
