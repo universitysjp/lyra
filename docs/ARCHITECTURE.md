@@ -96,7 +96,7 @@ No service-specific logic lives here — only contracts.
 
 - Consumes `SongEnrichedEvent`:
   - Uses the event's `ResolvedMetadata` (LRCLIB title/artist/album/duration/instrumental) as the canonical track shape for embedding summaries and later playlist filters, while keeping the user's `LocalTrackId` for playback.
-  - Generates vector embeddings via `Microsoft.Extensions.AI` (`IEmbeddingGenerator`) from the semantic summary.
+  - Generates one deployment-wide embedding per global track using OpenCode Go `text-embedding-3-small` (1536 dimensions); user BYOK connections are reserved for prompt rewriting and playlist selection.
   - Upserts embeddings into PostgreSQL using `pgvector`, with an `HNSW` cosine-distance index.
 - `POST /api/playlists/generate`:
   1. Rewrites the user's natural-language prompt into metadata filters plus a semantic search query.

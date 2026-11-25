@@ -6,5 +6,8 @@ public interface ITrackEmbeddingGenerator
 
     int Dimensions { get; }
 
-    Task<ReadOnlyMemory<float>> GenerateAsync(string text, CancellationToken ct);
+    Task<ReadOnlyMemory<float>> GenerateAsync(
+        string text,
+        string sessionId,
+        CancellationToken ct);
 }

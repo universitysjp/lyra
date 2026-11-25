@@ -165,7 +165,7 @@ Use `ResolvedMetadata` when present; otherwise use the event’s local metadata 
 ### Key Decisions
 
 1. **One deployment-wide embedding model.**  
-   Use a fixed provider/model/dimension for all users. Recommended default: OpenAI `text-embedding-3-small`, 1536 dimensions. This provides one vector space and one HNSW index.
+   Use a fixed provider/model/dimension for all users. Recommended default: OpenCode Go with `text-embedding-3-small`, 1536 dimensions, using a deployment-level `Rag__ApiKey`. This provides one vector space and one HNSW index.
 
 2. **Use `SongImportedEvent` for ownership.**  
    `SongEnrichedEvent.UserId` is the user who triggered enrichment, not every owner of the track. PlaylistRag must build its own per-user mapping from `SongImportedEvent`.
@@ -200,7 +200,8 @@ Use `ResolvedMetadata` when present; otherwise use the event’s local metadata 
 
 - Add `IAiEmbeddingGeneratorFactory`.
 - Add provider-specific embedding adapters:
-  - OpenAI first.
+  - OpenCode Go first (`text-embedding-3-small`).
+  - OpenAI available as an alternate deployment provider.
   - Gemini next, if required.
   - OpenCode only if the selected plan/model supports embeddings.
   - Anthropic: throw a clear “embeddings not supported” error.
@@ -518,7 +519,7 @@ Prerequisite, not part of RAG:
 ### Step 3: Add embedding support to `Lyra.AI`
 
 - Add `IAiEmbeddingGeneratorFactory`.
-- Implement OpenAI embeddings first; add Gemini next if needed.
+- Implement OpenCode Go embeddings with `text-embedding-3-small` (Go endpoint, `x-opencode-session`). Keep OpenAI as an alternate deployment provider.
 - Validate input length and output dimensions.
 - Add sanitized error handling.
 - Acceptance: dimension mismatch is rejected; fake generator tests pass.

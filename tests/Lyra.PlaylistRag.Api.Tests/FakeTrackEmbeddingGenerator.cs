@@ -11,7 +11,10 @@ internal sealed class FakeTrackEmbeddingGenerator : ITrackEmbeddingGenerator
 
     public string? LastText { get; private set; }
 
-    public Task<ReadOnlyMemory<float>> GenerateAsync(string text, CancellationToken ct)
+    public Task<ReadOnlyMemory<float>> GenerateAsync(
+        string text,
+        string sessionId,
+        CancellationToken ct)
     {
         LastText = text;
 

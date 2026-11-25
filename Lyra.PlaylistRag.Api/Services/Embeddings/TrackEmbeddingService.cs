@@ -49,7 +49,10 @@ public sealed class TrackEmbeddingService(
             enriched.EnergyLevel,
             enriched.SemanticSummary);
 
-        var embedding = await generator.GenerateAsync(text, ct);
+        var embedding = await generator.GenerateAsync(
+            text,
+            enriched.TrackId.ToString("N"),
+            ct);
         if (embedding.Length != TrackEmbedding.Dimensions)
         {
             throw new InvalidOperationException(

@@ -27,6 +27,12 @@ public static class DependencyInjection
             ServiceDescriptor.Singleton<IAiChatClientProvider, ClaudeChatClientProvider>());
         services.TryAddSingleton<IAiChatClientFactory, AiChatClientFactory>();
 
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAiEmbeddingGeneratorProvider, OpenAiEmbeddingGeneratorProvider>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAiEmbeddingGeneratorProvider, OpenCodeEmbeddingGeneratorProvider>());
+        services.TryAddSingleton<IAiEmbeddingGeneratorFactory, AiEmbeddingGeneratorFactory>();
+
         return services;
     }
 }

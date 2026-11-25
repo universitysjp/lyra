@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using DotNetEnv;
+using Lyra.AI;
+using Lyra.Contracts.AI;
 using Lyra.Contracts.Authentication;
 using Lyra.PlaylistRag.Api.Configuration;
 using Lyra.PlaylistRag.Api.Consumers;
 using Lyra.PlaylistRag.Api.Data;
+using Lyra.PlaylistRag.Api.Models;
 using Lyra.PlaylistRag.Api.Repositories;
 using Lyra.PlaylistRag.Api.Services.Embeddings;
 using MassTransit;
@@ -20,6 +23,8 @@ builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<PlaylistRagMessagingOptions>(
     builder.Configuration.GetSection(PlaylistRagMessagingOptions.SectionName));
+builder.Services.Configure<RagEmbeddingOptions>(
+    builder.Configuration.GetSection(RagEmbeddingOptions.SectionName));
 
 var vectorConnectionString =
     builder.Configuration.GetConnectionString("VectorDb")
@@ -32,6 +37,36 @@ var rabbitMq = builder.Configuration
 var messaging = builder.Configuration
     .GetSection(PlaylistRagMessagingOptions.SectionName)
     .Get<PlaylistRagMessagingOptions>() ?? new PlaylistRagMessagingOptions();
+var ragEmbedding = builder.Configuration
+    .GetSection(RagEmbeddingOptions.SectionName)
+    .Get<RagEmbeddingOptions>() ?? new RagEmbeddingOptions();
+
+if (!Enum.TryParse<AiProvider>(ragEmbedding.Provider, ignoreCase: true, out var embeddingProvider)
+    || !Enum.IsDefined(embeddingProvider)
+    || embeddingProvider is not (AiProvider.OpenAI or AiProvider.OpenCode))
+{
+    throw new InvalidOperationException(
+        "Rag:Provider must be OpenAI or OpenCode for embeddings.");
+}
+
+if (embeddingProvider == AiProvider.OpenCode
+    && (!Enum.TryParse<OpenCodePlan>(ragEmbedding.OpenCodePlan, ignoreCase: true, out var openCodePlan)
+        || !Enum.IsDefined(openCodePlan)))
+{
+    throw new InvalidOperationException(
+        "Rag:OpenCodePlan must be Go or PayAsYouGo for the OpenCode provider.");
+}
+
+if (string.IsNullOrWhiteSpace(ragEmbedding.Model)
+    || string.IsNullOrWhiteSpace(ragEmbedding.ApiKey)
+    || ragEmbedding.Dimensions != TrackEmbedding.Dimensions
+    || ragEmbedding.MaxInputCharacters <= 0
+    || ragEmbedding.RequestTimeoutSeconds <= 0)
+{
+    throw new InvalidOperationException(
+        "Rag embedding configuration is invalid. Set Rag:Model, Rag:Dimensions (1536), " +
+        "Rag:MaxInputCharacters, Rag:RequestTimeoutSeconds, and Rag__EmbeddingApiKey.");
+}
 
 if (!builder.Environment.IsEnvironment("Testing")
     && (string.IsNullOrWhiteSpace(rabbitMq.Username)
@@ -60,7 +95,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IUserTrackRepository, UserTrackRepository>();
 builder.Services.AddScoped<ITrackEmbeddingRepository, TrackEmbeddingRepository>();
 builder.Services.AddScoped<ITrackEmbeddingService, TrackEmbeddingService>();
-builder.Services.AddSingleton<ITrackEmbeddingGenerator, UnconfiguredTrackEmbeddingGenerator>();
+builder.Services.AddLyraAiProviders();
+builder.Services.AddSingleton<ITrackEmbeddingGenerator, AiTrackEmbeddingGenerator>();
 
 builder.Services.AddMassTransit(bus =>
 {

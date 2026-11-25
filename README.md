@@ -166,6 +166,20 @@ Supported providers are `OpenAI`, `Gemini`, `OpenCode`, and `Anthropic`. The Rea
 
 For `OpenCode`, choose a model that is eligible for external clients on the selected plan. OpenCode free-tier chat models are not available to external clients such as Lyra, so a free model name fails enrichment even though the connection saves successfully.
 
+### RAG Embeddings
+
+Playlist generation uses a **deployment-wide embedding model**, separate from each user's chat connection:
+
+```env
+Rag__Provider=OpenCode
+Rag__OpenCodePlan=Go
+Rag__Model=text-embedding-3-small
+Rag__Dimensions=1536
+Rag__ApiKey=<your OpenCode Go key>
+```
+
+`text-embedding-3-small` produces 1536-dimensional vectors, matching the `vector(1536)` column and HNSW index in `vector_db`. The embedding key is used only by `Lyra.PlaylistRag.Api`; user BYOK connections remain for prompt rewriting and playlist selection. The service fails fast if the provider, model, dimensions, or key are invalid.
+
 ### Run the Enrichment Pipeline
 
 Run Identity, Catalog, and the Worker together (RabbitMQ, PostgreSQL, and Redis must be up):
